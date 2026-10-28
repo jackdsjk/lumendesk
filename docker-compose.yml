@@ -28,37 +28,6 @@ services:
     networks:
       - echomind-network
 
-  echomind-java:
-    build:
-      context: ../EchoMindJava
-      dockerfile: Dockerfile
-    container_name: echomind-java
-    ports:
-      - "127.0.0.1:8080:8080"
-    env_file:
-      - ../EchoMindJava/.env
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-echomind123}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: 8000
-      ECHOMIND_DATA_DIR: /app/data/java
-      KNOWLEDGE_STORE_PATH: /app/data/java/knowledge-store.json
-      MEMORY_STORE_PATH: /app/data/java/memory-store.json
-      ECHOMIND_SKILLS_DIR: /app/skills
-    volumes:
-      - echomind-java-data:/app/data
-      - ../EchoMindJava/skills:/app/skills
-    depends_on:
-      redis:
-        condition: service_started
-      chromadb:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - echomind-network
-
   redis:
     image: redis:7-alpine
     container_name: echomind-redis
@@ -91,13 +60,10 @@ services:
     container_name: echomind-frontend
     environment:
       PYTHON_API_URL: /api/python
-      JAVA_API_URL: /api/java
     ports:
       - "${FRONTEND_PORT:-5174}:80"
     depends_on:
       echomind-python:
-        condition: service_started
-      echomind-java:
         condition: service_started
     restart: unless-stopped
     networks:
@@ -115,8 +81,6 @@ services:
         condition: service_started
       echomind-python:
         condition: service_started
-      echomind-java:
-        condition: service_started
     restart: unless-stopped
     networks:
       - echomind-network
@@ -129,4 +93,3 @@ volumes:
   redis-data:
   chromadb-data:
   echomind-python-data:
-  echomind-java-data:

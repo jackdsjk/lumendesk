@@ -1,29 +1,20 @@
 import { pollEvaluation } from './evaluationJobs.js'
-const DEFAULT_BACKENDS = {
-  python: {
-    id: 'python',
-    label: 'Python',
-    baseUrl: runtimeConfig().pythonApiUrl || import.meta.env.VITE_PYTHON_API_URL || '/api/python',
-    port: '8000'
-  },
-  java: {
-    id: 'java',
-    label: 'Java',
-    baseUrl: runtimeConfig().javaApiUrl || import.meta.env.VITE_JAVA_API_URL || '/api/java',
-    port: '8080'
-  }
+const PYTHON_BACKEND = {
+  id: 'python',
+  label: 'Python',
+  baseUrl: runtimeConfig().pythonApiUrl || import.meta.env.VITE_PYTHON_API_URL || '/api/python',
+  port: '8000'
 }
 
 export function createInitialSettings() {
   const saved = readSettings()
   return {
     pythonToken: '',
-    backend: saved.backend || import.meta.env.VITE_DEFAULT_BACKEND || 'python',
+    backend: 'python',
     userId: saved.userId || 'u1001',
     conversationId: saved.conversationId || '',
     endpoints: {
-      python: saved.endpoints?.python || DEFAULT_BACKENDS.python.baseUrl,
-      java: saved.endpoints?.java || DEFAULT_BACKENDS.java.baseUrl
+      python: saved.endpoints?.python || PYTHON_BACKEND.baseUrl
     }
   }
 }
@@ -33,10 +24,9 @@ export function saveSettings(settings) {
 }
 
 export function backendMeta(type, settings) {
-  const meta = DEFAULT_BACKENDS[type] || DEFAULT_BACKENDS.java
   return {
-    ...meta,
-    baseUrl: normalizeBaseUrl(settings.endpoints[type] || meta.baseUrl)
+    ...PYTHON_BACKEND,
+    baseUrl: normalizeBaseUrl(settings.endpoints.python || PYTHON_BACKEND.baseUrl)
   }
 }
 
@@ -62,13 +52,13 @@ export async function requestKnowledgeStats(type, settings) {
 
 export async function runEvaluation(type, settings, body = null, options = {}) {
   const taskKey = `echomind.eval:${type}:${backendMeta(type, settings).baseUrl}:${settings.userId}`
-  const savedJob = type === 'python' ? sessionStorage.getItem(taskKey) : null
+  const savedJob = sessionStorage.getItem(taskKey)
   const initial = savedJob ? {job_id: savedJob, status: 'queued', completed: 0, total: 0} : await requestFor(type, settings, '/eval/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined
   })
-  if (!initial.job_id) return initial // Java 后端仍兼容同步报告。
+  if (!initial.job_id) return initial
   sessionStorage.setItem(taskKey, initial.job_id)
   try {
     const result = await pollEvaluation(initial, jobId => requestFor(type, settings,
@@ -90,13 +80,11 @@ export async function requestChat(type, settings, message) {
   const meta = backendMeta(type, settings)
   const payload = buildChatPayload(type, settings, message)
   const attemptKey = JSON.stringify([type, meta.baseUrl, settings.userId, settings.conversationId, message])
-  if (type === 'python') {
-    if (!chatAttempts.has(attemptKey)) {
-      if (chatAttempts.size > 100) chatAttempts.clear()
-      chatAttempts.set(attemptKey, crypto.randomUUID())
-    }
-    payload.client_request_id = chatAttempts.get(attemptKey)
+  if (!chatAttempts.has(attemptKey)) {
+    if (chatAttempts.size > 100) chatAttempts.clear()
+    chatAttempts.set(attemptKey, crypto.randomUUID())
   }
+  payload.client_request_id = chatAttempts.get(attemptKey)
   const raw = await requestFor(type, settings, '/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -180,7 +168,7 @@ function normalizeToolTraceResponse(raw) {
 const chatAttempts = new Map()
 async function requestFor(type, settings, path, options = {}) {
   const headers = new Headers(options.headers || {})
-  if (type === 'python' && settings.pythonToken) headers.set('Authorization', `Bearer ${settings.pythonToken}`)
+  if (settings.pythonToken) headers.set('Authorization', `Bearer ${settings.pythonToken}`)
   return requestJson(backendMeta(type, settings).baseUrl, path, { ...options, headers,
     signal: options.signal || AbortSignal.timeout(path === '/chat' ? 55000 : 20000) })
 }

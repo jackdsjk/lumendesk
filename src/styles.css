@@ -119,10 +119,6 @@ pre { margin: 10px 0 0; padding: 12px; background: var(--soft); border: 1px soli
 .connection-status i, .dialog-health i { width: 5px; height: 5px; border-radius: 50%; background: #b1b1b8; flex-shrink: 0; }
 .connection-status .online, .dialog-health .online { background: var(--success); }
 .connection-status .offline, .dialog-health .offline { background: #b48e66; }
-.backend-tabs { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #f9f9fa; }
-.backend-tabs button { min-height: 26px; padding: 0 14px; background: transparent; color: var(--faint); border-radius: 5px; font-size: 11px; }
-.backend-tabs button.active { background: white; box-shadow: 0 1px 3px #18181b10; color: var(--ink); }
-.backend-tabs button:hover:not(.active) { color: var(--ink); background: #f0f0f1; }
 .settings-button { width: 30px; min-height: 30px; }
 .settings-button .icon { width: 17px; height: 17px; }
 .page-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -375,8 +371,6 @@ summary::-webkit-details-marker { display: none; }
   .mobile-brand .brand-mark { width: 26px; height: 26px; font-size: 19px; border-radius: 7px; }
   .topbar-tools { gap: 9px; }
   .connection-status { display: none; }
-  .backend-tabs { padding: 3px; }
-  .backend-tabs button { min-height: 25px; padding: 0 11px; font-size: 10px; }
   .settings-button { width: 28px; min-height: 30px; }
   .chat-toolbar { height: 46px; padding: 0 22px; }
   .conversation-label { font-size: 11px; }
@@ -436,7 +430,6 @@ summary::-webkit-details-marker { display: none; }
   .topbar { padding-inline: 17px; }
   .mobile-brand { gap: 7px; font-size: 17px; }
   .topbar-tools { gap: 6px; }
-  .backend-tabs button { padding-inline: 9px; }
   .chat-toolbar { padding-inline: 17px; }
   .conversation { padding-inline: 17px; }
   .welcome h1 { font-size: 26px; }

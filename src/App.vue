@@ -56,17 +56,6 @@
             <i :class="healthOk ? 'online' : 'offline'"></i>
             {{ healthOk ? '已连接' : healthLabel === '未检查' ? '连接中' : '未连接' }}
           </span>
-          <div class="backend-tabs" aria-label="选择后端">
-            <button
-              v-for="backend in ['java', 'python']"
-              :key="backend"
-              :class="{ active: settings.backend === backend }"
-              :aria-pressed="settings.backend === backend"
-              @click="switchBackend(backend)"
-            >
-              {{ backend === 'java' ? 'Java' : 'Python' }}
-            </button>
-          </div>
           <button class="icon-button settings-button" aria-label="连接配置" title="连接配置" @click="openConnection">
             <AppIcon name="sliders" />
           </button>
@@ -433,7 +422,7 @@
           <span>会话 ID</span>
           <input v-model="connectionDraft.conversationId" placeholder="留空以自动生成" />
         </label>
-        <label v-if="settings.backend === 'python'">
+        <label>
           <span>API 访问 Token（启用鉴权时填写，仅本页保存）</span>
           <input v-model="connectionDraft.pythonToken" type="password" autocomplete="off" placeholder="不是模型 API Key" />
         </label>
@@ -603,27 +592,6 @@ async function copyMessage(content) {
   }
 }
 
-function switchBackend(type) {
-  if (settings.backend === type) return
-  searched.value = false
-  requestState.invalidate()
-  busy.value = false
-  statusText.value = ''
-  knowledgeCount.value = '-'
-  monitorData.value = { agent_stats: {}, tool_stats: {}, active_alerts: [], suggestions: [] }
-  skillsData.value = { count: 0, skills: [], errors: [] }
-  evalData.value = null
-  settings.backend = type
-  persist()
-  healthOk.value = false
-  healthLabel.value = '未检查'
-  messages.value = []
-  searchResults.value = []
-  lastResponse.value = null
-  lastTrace.value = null
-  refreshConsole()
-}
-
 async function refreshConsole() {
   await Promise.allSettled([checkHealth(), loadStats(), loadMonitor(), loadSkills()])
 }
@@ -639,7 +607,7 @@ async function checkHealth() {
     statusText.value = JSON.stringify(data, null, 2)
   } catch (error) {
     if (!request.isCurrent()) return
-    // 健康检查只更新状态，保留用户选择的后端。
+    // 健康检查只更新状态，不改变当前连接配置。
     healthOk.value = false
     healthLabel.value = '不可用'
     statusText.value = error.message

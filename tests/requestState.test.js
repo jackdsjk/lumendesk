@@ -4,14 +4,13 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import { createRequestState } from '../src/lib/requestState.js'
 
-function state() { return { backend:'python', userId:'a', conversationId:'', endpoints:{python:'/py',java:'/java'} } }
+function state() { return { backend:'python', userId:'a', conversationId:'', endpoints:{python:'/py'} } }
 
-test('switching away and back invalidates old responses', () => {
+test('invalidating a request prevents stale responses', () => {
   const settings = state()
   const requests = createRequestState(settings)
   const old = requests.begin('stats')
-  settings.backend = 'java'; requests.invalidate()
-  settings.backend = 'python'; requests.invalidate()
+  requests.invalidate()
   assert.equal(old.isCurrent(), false)
   assert.equal(requests.begin('stats').isCurrent(), true)
 })
@@ -51,7 +50,7 @@ for (const [name, requestName, field, result] of [
       const context = vm.createContext({settings,requestState:requests,[field]:{value:'new'},[requestName]:()=>pending})
       loadFunction(name,context)
       const task = context[name]()
-      settings.backend='java'; requests.invalidate()
+      requests.invalidate()
       if (fail) reject(new Error('old')); else resolve(result)
       await task
       assert.equal(context[field].value,'new')
@@ -66,7 +65,7 @@ test('stale eval response does not clear a new operation busy state', async () =
     statusText:{value:''}, showToast:()=>assert.fail('stale toast'), requestEvaluation:()=>new Promise(a=>{resolve=a})})
   loadFunction('runEvaluation',context)
   const task=context.runEvaluation()
-  settings.backend='java'; requests.invalidate(); context.busy.value=true
+  requests.invalidate(); context.busy.value=true
   resolve({avg_scores:{accuracy:0.5}})
   await task
   assert.equal(context.evalData.value,'new')

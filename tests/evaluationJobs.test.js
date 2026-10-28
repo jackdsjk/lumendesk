@@ -10,7 +10,7 @@ test('polls until report is ready', async () => {
 test('propagates job failure', async () => {
   await assert.rejects(pollEvaluation({status:'failed',error:'timeout'}, () => {}), /timeout/)
 })
-test('backend switch stops polling', async () => {
+test('request invalidation stops polling', async () => {
   let called = false
   const result = await pollEvaluation({status:'queued'}, () => {called = true}, {isCurrent:() => false})
   assert.equal(result, null)
