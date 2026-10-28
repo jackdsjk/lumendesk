@@ -20,14 +20,14 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
 # 预下载 ChromaDB 内置的 ONNX embedding 模型（~79MB），避免运行时下载超时
-RUN python - <<'PY'
+RUN echo "LumenDesk Chroma cache" && python - <<'PY'
 import pathlib
 import shutil
 import tarfile
 import urllib.request
 
 url = "https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz"
-dest_dir = pathlib.Path("/root/.cache/chroma/onnx_models/all-MiniLM-L6-v2")
+dest_dir = pathlib.Path("/opt/chroma-cache/onnx_models/all-MiniLM-L6-v2")
 dest_dir.mkdir(parents=True, exist_ok=True)
 archive = dest_dir / "onnx.tar.gz"
 
@@ -39,6 +39,7 @@ with tarfile.open(archive, "r:gz") as tar:
 
 archive.unlink()
 PY
+RUN mkdir -p /opt/chroma-cache
 
 # ── 阶段 3：生产镜像 ──────────────────────────────────────────────────────────
 FROM base AS production
@@ -50,7 +51,7 @@ RUN useradd -m -u 1000 lumendesk
 COPY --from=dependencies /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=dependencies /usr/local/bin /usr/local/bin
 # 复制预下载的 ONNX 模型缓存
-COPY --from=dependencies --chown=lumendesk:lumendesk /root/.cache/chroma /home/lumendesk/.cache/chroma
+COPY --from=dependencies --chown=lumendesk:lumendesk /opt/chroma-cache /home/lumendesk/.cache/chroma
 
 # 复制应用代码
 COPY --chown=lumendesk:lumendesk . .
