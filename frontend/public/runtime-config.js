@@ -1,3 +1,3 @@
-window.__ECHOMIND_CONFIG__ = {
+window.__LUMENDESK_CONFIG__ = {
   pythonApiUrl: '/api/python'
 }

@@ -1,9 +1,9 @@
 <template>
   <div class="app-shell" :class="`view-${activeView}`">
     <aside class="navigation-rail" aria-label="主导航">
-      <a class="brand" href="#" @click.prevent="activeView = 'chat'" aria-label="EchoMind 首页">
-        <span class="brand-mark">E</span>
-        <span class="brand-name">EchoMind</span>
+      <a class="brand" href="#" @click.prevent="activeView = 'chat'" aria-label="LumenDesk 首页">
+        <span class="brand-mark">L</span>
+        <span class="brand-name">LumenDesk</span>
       </a>
       <button class="new-chat-button" @click="activeView = 'chat'; clearConversation()">
         <AppIcon name="plus" />
@@ -47,9 +47,9 @@
           <AppIcon name="chevron" />
           <strong>{{ currentView.label }}</strong>
         </div>
-        <a class="mobile-brand" href="#" @click.prevent="activeView = 'chat'" aria-label="EchoMind 首页">
-          <span class="brand-mark">E</span>
-          <span>EchoMind</span>
+        <a class="mobile-brand" href="#" @click.prevent="activeView = 'chat'" aria-label="LumenDesk 首页">
+          <span class="brand-mark">L</span>
+          <span>LumenDesk</span>
         </a>
         <div class="topbar-tools">
           <span class="connection-status" :title="statusText || healthLabel">
@@ -85,16 +85,16 @@
           <section class="conversation" :class="{ 'is-empty': !messages.length }" aria-label="客服对话">
             <div class="messages" ref="messageList" role="log" aria-label="对话消息" aria-live="polite" :aria-busy="busy && pendingAction === 'chat'">
               <div v-if="!messages.length" class="welcome">
-                <div class="welcome-mark" aria-hidden="true">E</div>
+                <div class="welcome-mark" aria-hidden="true">L</div>
                 <h1>今天，需要解决什么？</h1>
                 <p>从客户问题开始，让合适的 Agent 接手。</p>
               </div>
               <template v-else>
                 <article v-for="item in messages" :key="item.id" :class="['message', item.role, { 'message-error': item.error }]">
-                  <span v-if="item.role === 'assistant'" class="message-avatar">E</span>
+                  <span v-if="item.role === 'assistant'" class="message-avatar">L</span>
                   <div class="message-content">
                     <div class="message-meta">
-                      <strong>{{ item.role === 'user' ? '你' : 'EchoMind' }}</strong>
+                      <strong>{{ item.role === 'user' ? '你' : 'LumenDesk' }}</strong>
                       <span v-if="item.error" class="error-label">请求失败</span>
                       <small v-else-if="item.role === 'assistant'">{{ currentBackend.label }} Agent</small>
                     </div>
@@ -130,7 +130,7 @@
                   </div>
                 </article>
                 <div v-if="busy && pendingAction === 'chat'" class="thinking" role="status">
-                  <span class="message-avatar">E</span>
+                  <span class="message-avatar">L</span>
                   <span class="thinking-dots">
                     <i></i>
                     <i></i>

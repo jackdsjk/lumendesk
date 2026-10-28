@@ -8,7 +8,7 @@ class Document(BaseModel):
     query: str
     text: str
 
-server = FastMCP('EchoMind Test')
+server = FastMCP('LumenDesk Test')
 
 
 @server.tool(annotations=ToolAnnotations(readOnlyHint=True))

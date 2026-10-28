@@ -1,6 +1,6 @@
-# EchoMind Frontend
+# LumenDesk Frontend
 
-独立 Vue 前端项目，连接 EchoMind Python 后端并提供可展示的对话、知识库和评测界面。
+独立 Vue 前端项目，连接 LumenDesk Python 后端并提供可展示的对话、知识库和评测界面。
 
 项目目录：
 
@@ -58,7 +58,7 @@ npm run dev
 
 ## Docker 部署
 
-先配置 `../EchoMind/.env`，再启动完整服务：
+先配置 `../echomind/.env`，再启动完整服务：
 
 ```bash
 docker compose up -d --build
@@ -67,7 +67,7 @@ docker compose up -d --build
 前提是 `EchoMindFrontend` 的父目录下有这三个目录：
 
 ```text
-../EchoMind
+../echomind
 ./
 ```
 

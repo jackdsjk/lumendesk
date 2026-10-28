@@ -127,8 +127,8 @@ def test_embedding_check_endpoint_does_not_call_chat_model(monkeypatch, source, 
         rec._embedding_recognize = AsyncMock(return_value={
             'intent': IntentCategory.REFUND, 'confidence': .8, 'source': source})
         rec._llm_recognize = AsyncMock(side_effect=AssertionError('must not call LLM'))
-        monkeypatch.setenv('ECHOMIND_ENV', 'development')
-        monkeypatch.delenv('ECHOMIND_API_TOKENS', raising=False)
+        monkeypatch.setenv('LUMENDESK_ENV', 'development')
+        monkeypatch.delenv('LUMENDESK_API_TOKENS', raising=False)
         monkeypatch.setattr(api, '_orchestrator', SimpleNamespace(_intent_recognizer=rec))
         try:
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api.app), base_url='http://test') as http:

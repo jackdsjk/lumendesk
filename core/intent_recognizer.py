@@ -301,7 +301,7 @@ class IntentRecognizer:
                 max_tokens=256,
                 temperature=0.1,
                 messages=[{"role": "user", "content": prompt}],
-            ), timeout=max(0.1, float(os.getenv("ECHOMIND_INTENT_TIMEOUT_S", "8"))))
+            ), timeout=max(0.1, float(os.getenv("LUMENDESK_INTENT_TIMEOUT_S", "8"))))
             raw = extract_text_content(resp.content)
             s, e = raw.find("{"), raw.rfind("}") + 1
             data = json.loads(raw[s:e])

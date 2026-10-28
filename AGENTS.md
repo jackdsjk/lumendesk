@@ -1,8 +1,8 @@
-# EchoMind Python 项目协作规则
+# LumenDesk Python 项目协作规则
 
 ## 范围与用途
 
-- 本仓库只维护 EchoMind 的 Python 实现；可展示前端位于同级的 `EchoMindFrontend`。
+- 本仓库只维护 LumenDesk 的 Python 实现；可展示前端位于同级的 `EchoMindFrontend`。
 - HTTP 入口位于 `api/`，核心编排位于 `agents/` 与 `core/`，工具接入位于 `tooling/`，记忆与评测分别位于 `memory/`、`evaluation/`。
 - 修改符号、调用链或跨模块流程前，优先使用仓库内 `.codegraph/` 索引定位影响范围。
 

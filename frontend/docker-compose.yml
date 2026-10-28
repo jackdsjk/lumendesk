@@ -1,24 +1,24 @@
 services:
-  echomind-python:
+  lumendesk-python:
     build:
-      context: ../EchoMind
+      context: ../echomind
       dockerfile: Dockerfile
       target: production
-    container_name: echomind-python
+    container_name: lumendesk-python
     ports:
       - "127.0.0.1:8000:8000"
     env_file:
-      - ../EchoMind/.env
+      - ../echomind/.env
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-echomind123}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-echomind123}@redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-lumendesk123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-lumendesk123}@redis:6379/0
       CHROMA_PERSIST_DIRECTORY: /app/data/chroma
       EVAL_BASELINE_PATH: /app/data/eval/baseline.json
-      ECHOMIND_SKILLS_DIR: /app/skills
+      LUMENDESK_SKILLS_DIR: /app/skills
     volumes:
-      - echomind-python-data:/app/data
-      - ../EchoMind/skills:/app/skills
-      - ../EchoMind/config/mcp_servers.json:/app/config/mcp_servers.json:ro
+      - lumendesk-python-data:/app/data
+      - ../echomind/skills:/app/skills
+      - ../echomind/config/mcp_servers.json:/app/config/mcp_servers.json:ro
     depends_on:
       redis:
         condition: service_started
@@ -26,21 +26,21 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - echomind-network
+      - lumendesk-network
 
   redis:
     image: redis:7-alpine
-    container_name: echomind-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-echomind123}
+    container_name: lumendesk-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-lumendesk123}
     volumes:
       - redis-data:/data
     restart: unless-stopped
     networks:
-      - echomind-network
+      - lumendesk-network
 
   chromadb:
     image: chromadb/chroma:0.5.23
-    container_name: echomind-chromadb
+    container_name: lumendesk-chromadb
     ports:
       - "127.0.0.1:8001:8000"
     environment:
@@ -51,27 +51,27 @@ services:
       - chromadb-data:/chroma/chroma
     restart: unless-stopped
     networks:
-      - echomind-network
+      - lumendesk-network
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: echomind-frontend
+    container_name: lumendesk-frontend
     environment:
       PYTHON_API_URL: /api/python
     ports:
       - "${FRONTEND_PORT:-5174}:80"
     depends_on:
-      echomind-python:
+      lumendesk-python:
         condition: service_started
     restart: unless-stopped
     networks:
-      - echomind-network
+      - lumendesk-network
 
   nginx:
     image: nginx:1.27-alpine
-    container_name: echomind-gateway
+    container_name: lumendesk-gateway
     ports:
       - "127.0.0.1:80:80"
     volumes:
@@ -79,17 +79,17 @@ services:
     depends_on:
       frontend:
         condition: service_started
-      echomind-python:
+      lumendesk-python:
         condition: service_started
     restart: unless-stopped
     networks:
-      - echomind-network
+      - lumendesk-network
 
 networks:
-  echomind-network:
+  lumendesk-network:
     driver: bridge
 
 volumes:
   redis-data:
   chromadb-data:
-  echomind-python-data:
+  lumendesk-python-data:
