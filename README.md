@@ -2,7 +2,7 @@
 
 EchoMind 是面向客服场景的多 Agent 应用，提供通用咨询、技术支持、账单处理和升级转人工等处理路径。它把意图识别、Agent 路由、知识库检索、外部工具、会话记忆和评测串在同一条对话链路中，适合学习 Agent 工程、验证业务流程和扩展自己的客服场景。
 
-本仓库是 **Python 后端**，使用 FastAPI 提供 HTTP API，并提供标准 MCP 服务端。配套 Web 前端和 Java 后端位于独立项目中；只运行本仓库即可通过 Swagger 或 HTTP 客户端使用 Python 服务。
+本仓库是 **Python 后端**，使用 FastAPI 提供 HTTP API，并提供标准 MCP 服务端。可展示的 Web 前端位于同级独立项目中；只运行本仓库即可通过 Swagger 或 HTTP 客户端使用 Python 服务。
 
 当前账单工具提供核验字段检查和金额差值计算，人工升级提供交接摘要。实际订单查询、退款执行和工单创建，需要接入对应业务系统。
 
@@ -143,27 +143,21 @@ docker compose logs -f echomind
 
 ### 4. 使用配套 Web 前端（可选）
 
-本机已有根目录 Compose 数据环境时，可以直接叠加 Web 配置，复用现有 Python、Redis 和 ChromaDB 数据：
+在同级前端目录启动可展示的 Web 服务，复用 Python、Redis 和 ChromaDB：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.web.yml up -d --build
+cd ../EchoMindFrontend
+docker compose --env-file ../EchoMind/.env up -d --build
 ```
 
-此配置同时启动前端和 Java 后端，页面入口为 `http://localhost:5174` 或 `http://localhost`；Python API 保持 `http://localhost:8000`，Java API 为 `http://localhost:8080`。前端经同源路径代理请求，模型 Key 只传入后端。Java 使用本机既有数据卷 `echomindjava_app-data`；没有该卷时先执行 `docker volume create echomindjava_app-data`，也可通过 `ECHOMIND_JAVA_DATA_VOLUME` 指定另一个已有卷。后续启动、重建和停止这套环境时均携带上述两个 `-f` 参数。
+页面入口为 `http://localhost:5174` 或 `http://localhost`；Python API 保持 `http://localhost:8000`。前端经同源路径代理请求，模型 Key 只传入后端。
 
-如果同时拥有前端和 Java 项目，按配套 Compose 的相对路径摆放：
+如果同时拥有 Python 后端和前端项目，按配套 Compose 的相对路径摆放：
 
 ```text
 同一个父目录/
   EchoMind/           Python 后端，.env 放在这里
   EchoMindFrontend/   Web 前端及全栈 Compose
-  EchoMindJava/       Java 后端及其 .env
-```
-
-先按各项目说明配置环境，再在 `EchoMindFrontend` 目录执行：
-
-```bash
-docker compose --env-file ../EchoMind/.env up -d --build
 ```
 
 该部署的前端默认入口为 `http://localhost:5174`，也可经网关 `http://localhost` 访问。Python 服务名为 `echomind-python`，通过 `env_file` 读取 `../EchoMind/.env`；命令中的 `--env-file` 同时让 Compose 插值使用该文件里的 Redis 密码等值。

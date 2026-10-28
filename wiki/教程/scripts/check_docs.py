@@ -127,7 +127,7 @@ def main():
                             if p.is_file() and p.suffix in {".py", ".md", ".json", ".yml", ".yaml", ".conf"})
     source_paths.extend(ROOT / name for name in (
         "Dockerfile", ".dockerignore", ".env.example", "requirements.txt",
-        "requirements-dev.txt", "docker-compose.yml", "docker-compose.web.yml"))
+        "requirements-dev.txt", "docker-compose.yml"))
     git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True)
     report = dict(
         status="failed" if errors else "passed", counts=counts, errors=errors,

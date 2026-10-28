@@ -40,7 +40,7 @@ Agent 根据需要调用知识库、角色工具或外部 MCP 工具
 后台压缩历史、更新画像
 ```
 
-普通 Agent 使用 Anthropic Messages 协议调用模型，编排和并行执行由 Python、`asyncio` 完成。FastAPI 提供接口，Redis 保存近期会话，ChromaDB 保存知识库、历史摘要和用户画像。配套前端与 Java 后端在其他仓库中。
+普通 Agent 使用 Anthropic Messages 协议调用模型，编排和并行执行由 Python、`asyncio` 完成。FastAPI 提供接口，Redis 保存近期会话，ChromaDB 保存知识库、历史摘要和用户画像。可展示前端在同级独立项目中维护。
 
 系统目前有四类处理角色：
 
