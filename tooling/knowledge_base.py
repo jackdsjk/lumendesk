@@ -137,6 +137,12 @@ class KnowledgeBase:
         """异步导入文档；ChromaDB 客户端为同步实现，因此放入线程池执行。"""
         return await asyncio.to_thread(self.add_documents, documents)
 
+    async def warmup_async(self) -> None:
+        """预热 ChromaDB 的 embedding 模型，避免首个用户请求触发下载超时。"""
+        count = await asyncio.to_thread(self._collection.count)
+        if count:
+            await asyncio.to_thread(self.search, "LumenDesk 启动预热", 1)
+
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         语义检索：根据 query 返回最相关的文档片段。

@@ -139,6 +139,11 @@ async def lifespan(app: FastAPI):
         chroma_path=os.getenv("CHROMA_PERSIST_DIRECTORY", "/app/data/chroma"),
     )
     logger.info(f"知识库已加载: {await kb.doc_count_async()} 个文档片段")
+    try:
+        await kb.warmup_async()
+        logger.info("知识库 embedding 已预热")
+    except Exception:
+        logger.warning("知识库 embedding 预热失败，首次检索可能较慢", exc_info=True)
 
     def knowledge_fallback(params: Dict[str, Any], context: Optional[Dict[str, Any]], error: str):
         query = params.get("query", "")

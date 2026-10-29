@@ -2,11 +2,7 @@
 
 独立 Vue 前端项目，连接 LumenDesk Python 后端并提供可展示的对话、知识库和评测界面。
 
-项目目录：
-
-```text
-./EchoMindFrontend
-```
+项目目录：`frontend/`
 
 ## 功能
 
@@ -58,26 +54,22 @@ npm run dev
 
 ## Docker 部署
 
-先配置 `../echomind/.env`，再启动完整服务：
+完整服务请从 LumenDesk 项目根目录启动：
+
+```bash
+cd ..
+docker compose up -d --build
+```
+
+访问前端：`http://localhost`。
+
+如果后端已经通过根目录 Compose 启动，也可以单独启动前端：
 
 ```bash
 docker compose up -d --build
 ```
 
-前提是 `EchoMindFrontend` 的父目录下有这三个目录：
-
-```text
-../echomind
-./
-```
-
-访问前端：
-
-```text
-http://localhost
-```
-
-如果只想暴露前端端口，可改 `FRONTEND_PORT`，默认仍可通过 `80` 统一入口访问。
+单独启动时默认访问 `http://localhost:5174`，通过 `PYTHON_API_URL` 指向宿主机上的后端（默认 `http://localhost:8000`）。
 
 停止：
 
@@ -87,14 +79,4 @@ docker compose down
 
 ## 后端启动参考
 
-Python 版默认：
-
-```text
-http://localhost:8000
-```
-
-后端 Compose 服务通过 `env_file` 自动读取 Python 项目的 `.env`，普通启动不再需要额外 `--env-file`。
-共享 Redis 的密码和前端端口仍由前端目录的 `.env`、shell 或显式 `--env-file` 提供；
-Compose 中的 Redis 连接配置会覆盖后端文件内的 Redis 设置，保证应用连接同一个服务。
-Python 文件中的 `EVAL_JUDGE_MODEL`、`EVAL_JUDGE_MAX_TOKENS` 等配置也会完整传入容器。
-健康检查失败不会覆盖已有页面状态，旧请求也不能覆盖新页面的状态或回复。
+后端、Redis、ChromaDB 和 Nginx 的配置统一维护在项目根目录；前端不再引用旧的 `../echomind` 路径。

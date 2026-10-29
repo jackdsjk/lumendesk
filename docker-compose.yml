@@ -108,6 +108,29 @@ services:
       retries: 3
       start_period: 90s
 
+  # ── Web 前端 ────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lumendesk-frontend
+    environment:
+      PYTHON_API_URL: /api/python
+    expose:
+      - "80"
+    depends_on:
+      lumendesk:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - lumendesk-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # ── Nginx 反向代理 ──────────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine
@@ -119,6 +142,8 @@ services:
       - nginx-logs:/var/log/nginx
     depends_on:
       lumendesk:
+        condition: service_healthy
+      frontend:
         condition: service_healthy
     restart: unless-stopped
     networks:

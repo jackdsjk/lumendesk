@@ -1,6 +1,7 @@
 import sys
 import types
 import threading
+from unittest.mock import Mock
 
 try:
     import chromadb
@@ -70,3 +71,13 @@ def test_long_unpunctuated_text_respects_chunk_size():
     chunks = kb._chunk_text('长' * 1201, chunk_size=500)
     assert [len(c) for c in chunks] == [500, 500, 201]
     assert ''.join(chunks) == '长' * 1201
+
+
+def test_warmup_queries_existing_collection():
+    kb = make_kb()
+    kb._collection.count = Mock(return_value=1)
+    kb.search = Mock(return_value=[])
+    import asyncio
+
+    asyncio.run(kb.warmup_async())
+    kb.search.assert_called_once_with("LumenDesk 启动预热", 1)

@@ -129,40 +129,29 @@ docker compose ps
 docker compose logs -f lumendesk
 ```
 
-根目录 Compose 启动 LumenDesk API、Redis、ChromaDB、Prometheus 和 Nginx。**它不包含 Web 前端页面**，Nginx 在这里代理后端接口。
+根目录 Compose 启动 LumenDesk API、Web 前端、Redis、ChromaDB、Prometheus 和 Nginx。Nginx 提供前端页面，并将 `/api/python/*` 转发到 FastAPI。
 
 | 入口 | 地址 | 用途 |
 |---|---|---|
+| Web 前端 | `http://localhost` | LumenDesk 网页工作台 |
 | Swagger | `http://localhost:8000/docs` | 查看接口、填写请求并执行 |
 | 健康检查 | `http://localhost:8000/health` | 确认应用已完成初始化 |
 | API | `http://localhost:8000` | 后端接口地址，如 `/chat` |
-| Nginx | `http://localhost/docs` | 经反向代理访问 Swagger |
+| Nginx API | `http://localhost/api/python/health` | 前端同源 API 代理 |
 | Prometheus | `http://localhost:9090` | 查询监控指标 |
 
 健康检查成功后，在 Swagger 中执行一次 `POST /chat`，确认模型也能正常调用。`/health` 不验证模型 Key、额度或模型名称。
 
-### 4. 使用配套 Web 前端（可选）
+### 4. 单独启动前端（可选）
 
-在同级前端目录启动可展示的 Web 服务，复用 Python、Redis 和 ChromaDB：
+如果后端已经通过根目录 Compose 启动，也可以只在 `frontend/` 目录启动前端：
 
 ```bash
-cd ../EchoMindFrontend
-docker compose --env-file ../echomind/.env up -d --build
+cd frontend
+docker compose up -d --build
 ```
 
-页面入口为 `http://localhost:5174` 或 `http://localhost`；Python API 保持 `http://localhost:8000`。前端经同源路径代理请求，模型 Key 只传入后端。
-
-如果同时拥有 Python 后端和前端项目，按配套 Compose 的相对路径摆放：
-
-```text
-同一个父目录/
-  echomind/           Python 后端，.env 放在这里
-  EchoMindFrontend/   Web 前端及全栈 Compose
-```
-
-该部署的前端默认入口为 `http://localhost:5174`，也可经网关 `http://localhost` 访问。Python 服务名为 `lumendesk-python`，通过 `env_file` 读取 `../echomind/.env`；命令中的 `--env-file` 同时让 Compose 插值使用该文件里的 Redis 密码等值。
-
-两套 Compose 会使用重叠的端口和容器名，选择一种运行。切换部署方式前停止原来的那套；两套 Compose 的数据卷也相互独立，不会自动搬迁知识库和会话数据。
+默认访问 `http://localhost:5174`，前端通过 `PYTHON_API_URL`（默认 `http://localhost:8000`）访问后端。完整部署优先使用根目录 Compose，这样前端与 API 由同一个 Nginx 入口提供。
 
 <a id="configuration"></a>
 
@@ -211,11 +200,7 @@ docker compose up -d --build lumendesk
 
 修改 Redis 密码时，需要同时更新 Redis 和应用，可执行 `docker compose up -d --force-recreate redis lumendesk`。只执行 `restart` 不会重新读取容器的 `.env`。
 
-从前端目录部署时，使用对应的服务名和配置来源：
-
-```bash
-docker compose --env-file ../echomind/.env up -d --build --force-recreate lumendesk-python
-```
+从前端目录单独部署时，只需要重建前端服务；后端配置仍由根目录 Compose 管理。
 
 <a id="intent-embedding-setup"></a>
 
@@ -234,7 +219,7 @@ docker compose --env-file ../echomind/.env up -d --build --force-recreate lumend
 
 1. 在[硅基流动中国站控制台](https://cloud.siliconflow.cn/)注册或登录，按平台要求开通账号。
 2. 进入 API 密钥管理，创建 Key，并确认账号可使用 `BAAI/bge-m3`。
-3. 在 **echomind/.env** 中填写：
+3. 在 **LumenDesk 根目录 `.env`** 中填写：
 
 ```dotenv
 INTENT_EMBEDDING_ENABLED=true
@@ -258,7 +243,7 @@ SILICONFLOW_API_KEY=替换为你自己的硅基流动Key
 docker compose up -d --force-recreate lumendesk
 ```
 
-如果代码尚未构建过，加上 `--build`。从前端目录运行的用户，使用上一节中的 `lumendesk-python` 命令。
+如果代码尚未构建过，加上 `--build`。单独启动前端时，在 `frontend/` 目录重建 `frontend` 服务。
 
 ### 3. 验证实际调用
 
@@ -656,7 +641,7 @@ docker compose down
 | 容器构建失败或长时间停留在下载 | 查看构建日志，区分镜像拉取、Python 依赖安装和 ONNX 模型下载；首次构建需要这些网络资源。 |
 | 健康检查正常，但聊天失败 | 查看应用日志和模型服务响应，核对 Key、Anthropic 兼容地址、模型 ID、额度及工具调用支持。 |
 | 修改 `.env` 后不生效 | 重新创建应用容器；`restart` 只重启原容器。确认编辑的是 Python 项目的 `.env`。 |
-| 前端选择 Python 后不可用 | 在前端目录查看 `docker compose logs --tail=100 lumendesk-python`，检查 Python 健康接口及连接设置；按前文带 `--env-file` 的命令启动。 |
+| 前端页面或 API 不可用 | 先检查根目录 Compose 中 `frontend`、`lumendesk` 和 `nginx` 的状态；确认访问 `http://localhost`，并检查 `http://localhost/api/python/health`。 |
 | Redis 认证失败 | 检查 Redis 启动密码与应用 `REDIS_URL` 是否一致。改变密码后同时重新创建 Redis 和应用。 |
 | Embedding 的 `online_configured=false` | 检查 Key 是否为空、模式是否为 `local`、容器是否重新创建。 |
 | Embedding 返回 `http_401` / `http_403` | 检查是否使用硅基流动 Key，以及账号对当前模型的权限。 |
