@@ -275,7 +275,7 @@ async def access_control(request: HTTPRequest, call_next):
     if account is not None and request.url.path != "/health" and request.method != "OPTIONS":
         if not account:
             return JSONResponse({"detail": "需要有效 Bearer Token"}, status_code=401)
-        reader = request.url.path in {"/chat", "/search", "/knowledge/stats", "/skills", "/mcp", "/mcp/"}
+        reader = request.url.path in {"/chat", "/search", "/knowledge/stats", "/knowledge/documents", "/skills", "/mcp", "/mcp/"}
         if not reader and account["role"] != "admin":
             return JSONResponse({"detail": "该接口需要管理员权限"}, status_code=403)
     is_chat = request.url.path == "/chat" and request.method == "POST"
@@ -731,6 +731,38 @@ async def knowledge_stats():
         raise HTTPException(503, "知识库未初始化")
     kb = tool.handler.__self__
     return {"total_chunks": await kb.doc_count_async()}
+
+
+@app.get("/knowledge/documents", tags=["知识库"])
+async def knowledge_documents(
+    product_id: Optional[str] = Query(default=None, max_length=120),
+    region: Optional[str] = Query(default=None, max_length=40),
+    channel: Optional[str] = Query(default=None, max_length=40),
+    tenant_scope: Optional[str] = Query(default=None, max_length=120),
+    include_unpublished: bool = Query(default=False),
+    limit: int = Query(default=100, ge=1, le=100),
+):
+    """按原始文档返回知识库目录及完整内容，供前端管理界面浏览。"""
+    tool = _tool_manager._tools.get("knowledge_search") if _tool_manager else None
+    if tool is None:
+        raise HTTPException(503, "知识库未初始化")
+    kb = tool.handler.__self__
+    try:
+        documents = await kb.list_documents_async(
+            product_id=product_id,
+            region=region,
+            channel=channel,
+            tenant_scope=tenant_scope,
+            include_unpublished=include_unpublished,
+            limit=limit,
+        )
+    except ValueError as ex:
+        raise HTTPException(400, str(ex)) from ex
+    return {
+        "documents": documents,
+        "total_documents": len(documents),
+        "total_chunks": sum(int(document.get("chunk_count", 0)) for document in documents),
+    }
 
 
 @app.post("/eval/run", status_code=202)

@@ -267,6 +267,28 @@ summary::-webkit-details-marker { display: none; }
 .count-display strong { font-size: 29px; font-weight: 500; letter-spacing: -.03em; }
 .count-display span { font-size: 11px; color: var(--faint); white-space: nowrap; }
 .knowledge-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; }
+.catalog-workspace { margin-bottom: 24px; }
+.catalog-workspace .card-heading { align-items: flex-start; }
+.catalog-workspace .card-heading .muted { margin-top: 7px; }
+.document-catalog { display: grid; gap: 10px; }
+.document-card { border: 1px solid var(--line); border-radius: 9px; background: #fcfcfd; }
+.document-card[open] { background: white; }
+.document-card summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; padding: 15px 17px; cursor: pointer; list-style: none; }
+.document-card summary::-webkit-details-marker { display: none; }
+.document-card summary::after { content: '⌄'; color: var(--faint); font-size: 16px; line-height: 1; }
+.document-card[open] summary::after { content: '⌃'; }
+.document-summary { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.document-summary strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.document-summary span { color: var(--faint); font-size: 10px; }
+.document-statuses { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.status-pill { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; font-size: 10px; white-space: nowrap; }
+.status-published { color: var(--success); background: #45876612; }
+.status-draft { color: var(--muted); background: var(--soft); }
+.document-detail { padding: 0 17px 17px; border-top: 1px solid var(--line); }
+.document-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 12px 0; color: var(--faint); font-size: 10px; }
+.document-meta a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.document-content { color: var(--muted); font-size: 12px; line-height: 1.95; white-space: pre-wrap; overflow-wrap: anywhere; }
+.catalog-empty { min-height: 150px; }
 .workspace-card { border: 1px solid var(--line); border-radius: 12px; padding: 25px; background: white; min-width: 0; }
 .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 23px; }
 .card-heading .kicker { display: none; }
@@ -432,6 +454,8 @@ summary::-webkit-details-marker { display: none; }
   .heading-copy p { font-size: 12px; }
   .knowledge-layout, .evaluation-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .workspace-card { padding: 22px; }
+  .document-card summary { flex-direction: column; }
+  .document-statuses { justify-content: flex-start; }
   .workspace-empty { min-height: 240px; }
   .skills-workspace { margin-top: 18px; }
   .skill-item { grid-template-columns: 5px minmax(0, 1fr) 60px; gap: 10px; }

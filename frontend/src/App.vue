@@ -224,6 +224,55 @@
             <span>知识片段</span>
           </div>
         </div>
+        <section class="workspace-card catalog-workspace">
+          <div class="card-heading">
+            <div>
+              <span class="kicker">CATALOG</span>
+              <h2>知识目录</h2>
+              <p class="muted">查看知识库中保存的全部文档，而不只是检索命中的片段。</p>
+            </div>
+            <button class="text-button" :disabled="busy || documentsLoading" @click="loadDocuments">
+              <AppIcon name="refresh" />
+              {{ documentsLoading ? '加载中' : '刷新目录' }}
+            </button>
+          </div>
+          <div v-if="documentsLoading" class="workspace-empty catalog-empty">
+            <AppIcon name="refresh" />
+            <p>正在加载知识目录…</p>
+          </div>
+          <div v-else-if="knowledgeDocuments.length" class="document-catalog">
+            <details v-for="document in knowledgeDocuments" :key="document.document_id" class="document-card">
+              <summary>
+                <div class="document-summary">
+                  <strong>{{ document.title || '未命名文档' }}</strong>
+                  <span>{{ document.chunk_count || 0 }} 个片段</span>
+                </div>
+                <div class="document-statuses">
+                  <span class="status-pill" :class="document.approval_status === 'approved' && document.publication_status === 'published' ? 'status-published' : 'status-draft'">
+                    {{ document.approval_status === 'approved' && document.publication_status === 'published' ? '已发布' : '未发布' }}
+                  </span>
+                  <span v-for="scope in scopeEntries({ product_id: document.product_id, region: document.region, channel: document.channel, tenant_scope: document.tenant_scope })" :key="scope.key" class="scope-chip">
+                    {{ scope.label }}：{{ scope.value }}
+                  </span>
+                </div>
+              </summary>
+              <div class="document-detail">
+                <div class="document-meta">
+                  <span v-if="document.source_title">来源：{{ document.source_title }}</span>
+                  <a v-if="document.source_url" :href="document.source_url" target="_blank" rel="noreferrer">打开来源</a>
+                  <span v-if="document.version">版本：{{ document.version }}</span>
+                  <span v-if="document.effective_from">生效：{{ document.effective_from }}</span>
+                </div>
+                <p class="document-content">{{ document.content }}</p>
+              </div>
+            </details>
+          </div>
+          <div v-else class="workspace-empty catalog-empty">
+            <AppIcon name="book" />
+            <h3>暂无知识文档</h3>
+            <p>添加知识后，文档会出现在这里。</p>
+          </div>
+        </section>
         <div class="knowledge-layout">
           <section class="workspace-card search-workspace">
             <div class="card-heading">
@@ -489,6 +538,7 @@ import {
   reloadSkills,
   requestChat,
   requestHealth,
+  requestKnowledgeDocuments,
   requestKnowledgeStats,
   requestMonitor,
   requestSearch,
@@ -514,6 +564,8 @@ const healthOk = ref(false)
 const healthLabel = ref('未检查')
 const statusText = ref('')
 const knowledgeCount = ref('-')
+const knowledgeDocuments = ref([])
+const documentsLoading = ref(false)
 const searchQuery = ref('退款多久能到账')
 const searchResults = ref([])
 const searchEvidence = ref(null)
@@ -616,6 +668,7 @@ function saveConnection() {
     monitorData.value = { agent_stats: {}, tool_stats: {}, active_alerts: [], suggestions: [] }
     skillsData.value = { count: 0, skills: [], errors: [] }
     knowledgeCount.value = '—'
+    knowledgeDocuments.value = []
     healthOk.value = false
     healthLabel.value = '未检查'
     statusText.value = ''
@@ -641,7 +694,7 @@ async function copyMessage(content) {
 }
 
 async function refreshConsole() {
-  await Promise.allSettled([checkHealth(), loadStats(), loadMonitor(), loadSkills()])
+  await Promise.allSettled([checkHealth(), loadStats(), loadDocuments(), loadMonitor(), loadSkills()])
 }
 
 async function checkHealth() {
@@ -670,6 +723,20 @@ async function loadStats() {
     knowledgeCount.value = data.total_chunks ?? data.totalChunks ?? '-'
   } catch {
     if (request.isCurrent()) knowledgeCount.value = '-'
+  }
+}
+
+async function loadDocuments() {
+  const request = requestState.begin('documents')
+  documentsLoading.value = true
+  try {
+    const data = await requestKnowledgeDocuments(request.backend, request.settings)
+    if (!request.isCurrent()) return
+    knowledgeDocuments.value = Array.isArray(data.documents) ? data.documents : []
+  } catch {
+    if (request.isCurrent()) knowledgeDocuments.value = []
+  } finally {
+    if (request.isCurrent()) documentsLoading.value = false
   }
 }
 
@@ -796,6 +863,7 @@ async function submitKnowledge() {
     if (!request.isCurrent()) return
     statusText.value = JSON.stringify(data, null, 2)
     await loadStats()
+    await loadDocuments()
     if (!request.isCurrent()) return
     showToast('文档已添加')
   } catch (error) {
@@ -817,6 +885,7 @@ async function handleUpload(event) {
     if (!request.isCurrent()) return
     statusText.value = JSON.stringify(data, null, 2)
     await loadStats()
+    await loadDocuments()
     if (!request.isCurrent()) return
     showToast(`${file.name} 导入成功`)
   } catch (error) {

@@ -253,6 +253,72 @@ class KnowledgeBase:
         """异步获取文档片段数量。"""
         return await asyncio.to_thread(self._collection.count)
 
+    def list_documents(
+        self,
+        *,
+        product_id: Optional[str] = None,
+        region: Optional[str] = None,
+        channel: Optional[str] = None,
+        tenant_scope: Optional[str] = None,
+        include_unpublished: bool = False,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """返回按原始文档聚合的知识目录，供管理界面浏览。"""
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("limit 必须是 1–100 的整数")
+        rows = self._collection.get(include=["documents", "metadatas"])
+        grouped: Dict[str, Dict[str, Any]] = {}
+        for row_id, content, raw_metadata in zip(
+            rows.get("ids") or [],
+            rows.get("documents") or [],
+            rows.get("metadatas") or [],
+        ):
+            metadata = raw_metadata or {}
+            if product_id and metadata.get("product_id") != product_id:
+                continue
+            if region and metadata.get("region") != region:
+                continue
+            if channel and metadata.get("channel") != channel:
+                continue
+            if tenant_scope and metadata.get("tenant_scope") not in {tenant_scope, "global"}:
+                continue
+            if not include_unpublished and (
+                metadata.get("approval_status") != "approved"
+                or metadata.get("publication_status") != "published"
+            ):
+                continue
+            document_id = str(metadata.get("document_id") or row_id.split(":", 1)[0])
+            group = grouped.setdefault(document_id, {
+                "document_id": document_id,
+                "title": metadata.get("title", ""),
+                "chunks": [],
+                "metadata": dict(metadata),
+            })
+            group["chunks"].append((
+                int(metadata.get("chunk_index", 0) or 0),
+                str(content or ""),
+            ))
+
+        documents: List[Dict[str, Any]] = []
+        for group in grouped.values():
+            chunks = sorted(group["chunks"], key=lambda item: item[0])
+            metadata = group["metadata"]
+            document = {
+                "document_id": group["document_id"],
+                "title": group["title"],
+                "content": "\n".join(content for _, content in chunks),
+                "chunk_count": len(chunks),
+                "version": metadata.get("version", ""),
+            }
+            document.update({field: metadata.get(field, "") for field in self.METADATA_FIELDS})
+            documents.append(document)
+        documents.sort(key=lambda item: (item["title"].lower(), item["document_id"]))
+        return documents[:limit]
+
+    async def list_documents_async(self, **filters: Any) -> List[Dict[str, Any]]:
+        """异步返回知识目录；ChromaDB 客户端为同步实现。"""
+        return await asyncio.to_thread(self.list_documents, **filters)
+
     # ── MCP 工具 handler ─────────────────────────────────────────────────────
 
     async def search_handler(self, params: Dict[str, Any], context: Any) -> List[Dict]:

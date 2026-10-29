@@ -50,6 +50,14 @@ export async function requestKnowledgeStats(type, settings) {
   return requestFor(type, settings, '/knowledge/stats')
 }
 
+export async function requestKnowledgeDocuments(type, settings, limit = 100) {
+  const params = new URLSearchParams({
+    include_unpublished: 'true',
+    limit: String(limit)
+  })
+  return requestFor(type, settings, `/knowledge/documents?${params}`)
+}
+
 export async function runEvaluation(type, settings, body = null, options = {}) {
   const taskKey = `lumendesk.eval:${type}:${backendMeta(type, settings).baseUrl}:${settings.userId}`
   const savedJob = sessionStorage.getItem(taskKey)
