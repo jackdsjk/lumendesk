@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "purpose": "LumenDesk Support Cloud 资料治理演示来源登记表。外部资料只作为可追溯参考，不代表 LumenDesk 的官方政策。",
+  "last_reviewed_at": "2026-10-29T12:26:31Z",
+  "sources": [
+    {
+      "source_id": "stripe-refunds-2026-10-29",
+      "source_url": "https://docs.stripe.com/refunds",
+      "source_title": "Refund and cancel payments",
+      "source_publisher": "Stripe",
+      "source_kind": "official_public_documentation",
+      "retrieved_at": "2026-10-29T12:26:31Z",
+      "source_hash": "sha256:764bb8d8da42be5955e600620565a3e53a4a18c1442e5fb456ab9914e7e41dc2",
+      "hash_scope": "Jina Reader Markdown response captured during this review",
+      "robots_result": "allow",
+      "collection_status": "fetched_reference_only",
+      "license_or_permission": "公开官方文档；本登记不主张获得再发布授权。仅提炼通用概念，不复制原文，不将 Stripe 政策改名为 LumenDesk 政策。",
+      "adaptation_notes": "仅参考原支付方式退款、部分退款、退款失败需要升级处理等概念。退款窗口、费用、处理时效和审批规则由 LumenDesk 自行定义并需业务负责人审核。",
+      "snapshot_retention": "原始响应未提交到仓库；仅保留来源元数据和 hash。"
+    },
+    {
+      "source_id": "owasp-authentication-2026-10-29",
+      "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+      "source_title": "Authentication - OWASP Cheat Sheet Series",
+      "source_publisher": "OWASP Foundation",
+      "source_kind": "official_public_guidance",
+      "retrieved_at": "2026-10-29T12:26:31Z",
+      "source_hash": "sha256:104827d0cb00fc601e5361c4dfd4cbe77779b6764b0bea3bd92b583928bb280c",
+      "hash_scope": "Jina Reader Markdown response captured during this review",
+      "robots_result": "allow",
+      "collection_status": "fetched_reference_only",
+      "last_collection_attempt_at": "2026-10-29T12:31:54Z",
+      "last_collection_status": "skipped_robots_or_invalid_url",
+      "last_collection_note": "当前采集器无法可靠读取 robots.txt，因此按 fail-closed 规则跳过；不影响此前登记的参考 hash，但本次不生成新快照。",
+      "license_or_permission": "OWASP 页面声明除非另有说明，内容采用 Creative Commons Attribution-ShareAlike v4.0；如未来再分发改编内容，必须保留归属并遵守相同许可。此处仅保存自有摘要草案。",
+      "adaptation_notes": "仅参考 MFA、敏感操作重新认证、密码恢复和避免泄露账户存在性等安全原则。LumenDesk 的具体安全承诺必须由安全负责人确认，不能把 OWASP 建议当作产品已实现能力。",
+      "snapshot_retention": "原始响应未提交到仓库；仅保留来源元数据和 hash。"
+    },
+    {
+      "source_id": "atlassian-incident-communication-candidate-2026-10-29",
+      "source_url": "https://support.atlassian.com/statuspage/docs/incident-communication/",
+      "source_title": "Atlassian Support",
+      "source_publisher": "Atlassian",
+      "source_kind": "official_public_documentation_candidate",
+      "retrieved_at": "2026-10-29T12:26:31Z",
+      "source_hash": "sha256:ee5521c8f5722616f5a16ad3272b6a9d7a4bd8e2ac5cfaff6315a844094c836e",
+      "hash_scope": "Jina Reader Markdown response captured during this review",
+      "robots_result": "not_verified",
+      "collection_status": "not_usable_http_404",
+      "license_or_permission": "未建立授权判断；由于页面返回 404，不得作为知识库事实来源。",
+      "adaptation_notes": "不生成基于该页面的事实摘要。若后续确认正确的官方 URL，再单独抓取、核验并审核。",
+      "snapshot_retention": "仅保留失败响应的 hash，不保存页面正文。"
+    }
+  ]
+}

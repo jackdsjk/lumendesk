@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import threading
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import chromadb
@@ -34,6 +35,14 @@ class KnowledgeBase:
     """
 
     COLLECTION_NAME = "knowledge_base"
+    APPROVAL_STATUSES = {"draft", "approved", "rejected", "retired"}
+    PUBLICATION_STATUSES = {"unpublished", "published", "withdrawn"}
+    METADATA_FIELDS = {
+        "product_id", "region", "channel", "tenant_scope", "source_url", "source_title",
+        "source_hash", "approval_status", "publication_status", "effective_from", "effective_to",
+        "fetched_at", "published_at", "reviewer", "reviewed_at", "adapted_from_document_id",
+        "policy_type", "locale",
+    }
 
     def __init__(
         self,
@@ -77,7 +86,7 @@ class KnowledgeBase:
 
     # ── 文档管理 ──────────────────────────────────────────────────────────────
 
-    def add_documents(self, documents: List[Dict[str, str]]) -> int:
+    def add_documents(self, documents: List[Dict[str, Any]]) -> int:
         """
         批量导入文档到知识库。
 
@@ -87,6 +96,8 @@ class KnowledgeBase:
         # 相同文档身份在同一批次只采用最后一个版本，避免重复 ID。
         prepared = {}
         for doc in documents:
+            if not isinstance(doc, dict):
+                raise ValueError("文档必须是对象")
             title, content = doc.get("title", ""), doc.get("content", "")
             if not isinstance(title, str) or not isinstance(content, str):
                 raise ValueError("文档 title 和 content 必须是字符串")
@@ -95,14 +106,18 @@ class KnowledgeBase:
             explicit_id = doc.get("document_id")
             if explicit_id is not None and (not isinstance(explicit_id, str) or not explicit_id.strip()):
                 raise ValueError("document_id 必须是非空字符串")
-            identity = json.dumps(["explicit", explicit_id] if explicit_id else ["title", title], ensure_ascii=True)
+            metadata = self._normalize_metadata(doc, content)
+            identity_parts = ["explicit", explicit_id] if explicit_id else (
+                ["source", metadata["source_url"], title] if metadata["source_url"] else ["title", title]
+            )
+            identity = json.dumps(identity_parts, ensure_ascii=True)
             if not isinstance(identity, str):
                 raise ValueError("document_id 必须是字符串")
-            prepared[identity] = (title, content, bool(doc.get("document_id")))
+            prepared[identity] = (title, content, bool(doc.get("document_id")), metadata)
 
         count = 0
         with self._write_lock:
-            for identity, (title, content, explicit) in prepared.items():
+            for identity, (title, content, explicit, metadata) in prepared.items():
                 document_id = hashlib.sha256(identity.encode()).hexdigest()
                 chunks = self._chunk_text(content, chunk_size=500)
                 version = hashlib.sha256(content.encode()).hexdigest()
@@ -110,9 +125,9 @@ class KnowledgeBase:
                 existing = self._collection.get(where={"document_id": document_id}, include=["metadatas"])
                 old_ids = set(existing["ids"])
                 # 仅迁移归属可验证的旧身份；旧显式 ID 与 title: 前缀冲突时保留旧记录供核验。
-                kind, value = json.loads(identity)
-                legacy_identity = value if explicit else f"title:{title}"
-                if not explicit or not value.startswith("title:"):
+                identity_parts = json.loads(identity)
+                legacy_identity = identity_parts[1] if explicit else f"title:{title}"
+                if not explicit or not str(legacy_identity).startswith("title:"):
                     legacy_id = hashlib.sha256(legacy_identity.encode()).hexdigest()
                     previous = self._collection.get(where={"document_id": legacy_id}, include=["metadatas"])
                     old_ids.update(i for i, meta in zip(previous["ids"], previous["metadatas"])
@@ -124,7 +139,8 @@ class KnowledgeBase:
                                    if not (meta or {}).get("document_id"))
                 self._collection.upsert(ids=ids, documents=chunks, metadatas=[
                     {"title": title, "document_id": document_id, "version": version,
-                     "chunk_index": i, "total_chunks": len(chunks)} for i in range(len(chunks))
+                     "chunk_index": i, "total_chunks": len(chunks), **metadata}
+                    for i in range(len(chunks))
                 ])
                 stale = old_ids - set(ids)
                 if stale:
@@ -133,7 +149,7 @@ class KnowledgeBase:
         logger.info("知识库写入 %s 个文档片段", count)
         return count
 
-    async def add_documents_async(self, documents: List[Dict[str, str]]) -> int:
+    async def add_documents_async(self, documents: List[Dict[str, Any]]) -> int:
         """异步导入文档；ChromaDB 客户端为同步实现，因此放入线程池执行。"""
         return await asyncio.to_thread(self.add_documents, documents)
 
@@ -143,7 +159,16 @@ class KnowledgeBase:
         if count:
             await asyncio.to_thread(self.search, "LumenDesk 启动预热", 1)
 
-    def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        *,
+        product_id: Optional[str] = None,
+        region: Optional[str] = None,
+        channel: Optional[str] = None,
+        tenant_scope: Optional[str] = "global",
+    ) -> List[Dict[str, Any]]:
         """
         语义检索：根据 query 返回最相关的文档片段。
 
@@ -154,9 +179,22 @@ class KnowledgeBase:
         count = self._collection.count()
         if not count:
             return []
+        where_conditions: List[Dict[str, Any]] = [
+            {"approval_status": "approved"},
+            {"publication_status": "published"},
+        ]
+        for field, value in (("product_id", product_id), ("region", region), ("channel", channel)):
+            if value:
+                where_conditions.append({field: value})
+        if tenant_scope:
+            where_conditions.append({"$or": [
+                {"tenant_scope": tenant_scope},
+                {"tenant_scope": "global"},
+            ]})
         results = self._collection.query(
             query_texts=[query],
-            n_results=min(top_k, count),
+            n_results=min(max(top_k * 5, top_k), count),
+            where={"$and": where_conditions},
         )
 
         items = []
@@ -166,20 +204,44 @@ class KnowledgeBase:
                 results["metadatas"][0],
                 results["distances"][0],
             ):
+                meta = meta or {}
+                if not self._is_currently_effective(meta):
+                    continue
                 items.append({
                     "title":    meta.get("title", ""),
                     "content":  doc,
-                    "score":    round(1.0 - dist, 4),  # ChromaDB 返回距离，转为相似度
+                    # Chroma 距离不保证落在 [0, 1]；用单调变换暴露稳定的 [0, 1] 相似度展示值。
+                    "score":    round(1.0 / (1.0 + max(0.0, float(dist))), 4),
                     "chunk":    meta.get("chunk_index", 0),
                     "document_id": meta.get("document_id", ""),
                     "version": meta.get("version", ""),
+                    "product_id": meta.get("product_id", ""),
+                    "region": meta.get("region", ""),
+                    "channel": meta.get("channel", ""),
+                    "tenant_scope": meta.get("tenant_scope", "global"),
+                    "source_url": meta.get("source_url", ""),
+                    "source_title": meta.get("source_title", ""),
+                    "source_hash": meta.get("source_hash", ""),
+                    "approval_status": meta.get("approval_status", "draft"),
+                    "publication_status": meta.get("publication_status", "unpublished"),
+                    "effective_from": meta.get("effective_from", ""),
+                    "effective_to": meta.get("effective_to", ""),
+                    "fetched_at": meta.get("fetched_at", ""),
+                    "published_at": meta.get("published_at", ""),
+                    "reviewer": meta.get("reviewer", ""),
+                    "reviewed_at": meta.get("reviewed_at", ""),
+                    "adapted_from_document_id": meta.get("adapted_from_document_id", ""),
+                    "policy_type": meta.get("policy_type", ""),
+                    "locale": meta.get("locale", ""),
                 })
+                if len(items) >= top_k:
+                    break
 
         return items
 
-    async def search_async(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    async def search_async(self, query: str, top_k: int = 5, **filters: Optional[str]) -> List[Dict[str, Any]]:
         """异步检索；ChromaDB 客户端为同步实现，因此放入线程池执行。"""
-        return await asyncio.to_thread(self.search, query, top_k)
+        return await asyncio.to_thread(self.search, query, top_k, **filters)
 
     @property
     def doc_count(self) -> int:
@@ -203,7 +265,18 @@ class KnowledgeBase:
         """
         query = params.get("query", "")
         top_k = params.get("top_k", 5)
-        return await self.search_async(query, top_k=top_k)
+        filters = dict(params.get("filters") or {})
+        for key in ("product_id", "region", "channel", "tenant_scope"):
+            if params.get(key):
+                filters[key] = params[key]
+        if isinstance(context, dict):
+            filters.update(context.get("knowledge_filters") or {})
+        allowed = {
+            key: filters[key].strip()
+            for key in ("product_id", "region", "channel", "tenant_scope")
+            if isinstance(filters.get(key), str) and filters[key].strip()
+        }
+        return await self.search_async(query, top_k=top_k, **allowed)
 
     # ── 内部方法 ──────────────────────────────────────────────────────────────
 
@@ -233,6 +306,66 @@ class KnowledgeBase:
             chunks.append(current)
 
         return chunks
+
+    @classmethod
+    def _normalize_metadata(cls, doc: Dict[str, Any], content: str) -> Dict[str, str]:
+        """校验并规范化受控的文档级 metadata。"""
+        unknown = set(doc) - ({"title", "content", "document_id"} | cls.METADATA_FIELDS)
+        if unknown:
+            raise ValueError(f"不支持的知识库 metadata 字段: {', '.join(sorted(unknown))}")
+
+        metadata: Dict[str, str] = {}
+        for field in cls.METADATA_FIELDS:
+            value = doc.get(field, "")
+            if value is None:
+                value = ""
+            if not isinstance(value, str):
+                raise ValueError(f"metadata 字段 {field} 必须是字符串")
+            metadata[field] = value.strip()
+
+        metadata["tenant_scope"] = metadata["tenant_scope"] or "global"
+        metadata["source_hash"] = metadata["source_hash"] or hashlib.sha256(content.encode()).hexdigest()
+        metadata["approval_status"] = metadata["approval_status"] or "draft"
+        metadata["publication_status"] = metadata["publication_status"] or "unpublished"
+        if metadata["approval_status"] not in cls.APPROVAL_STATUSES:
+            raise ValueError("approval_status 必须是 draft、approved、rejected 或 retired")
+        if metadata["publication_status"] not in cls.PUBLICATION_STATUSES:
+            raise ValueError("publication_status 必须是 unpublished、published 或 withdrawn")
+        for field in ("effective_from", "effective_to", "fetched_at", "published_at", "reviewed_at"):
+            if metadata[field]:
+                cls._parse_datetime(metadata[field], field)
+        if metadata["effective_from"] and metadata["effective_to"]:
+            if cls._parse_datetime(metadata["effective_to"], "effective_to") < cls._parse_datetime(metadata["effective_from"], "effective_from"):
+                raise ValueError("effective_to 不能早于 effective_from")
+        return metadata
+
+    @staticmethod
+    def _parse_datetime(value: str, field: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as ex:
+            raise ValueError(f"{field} 必须是 ISO-8601 时间") from ex
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    @classmethod
+    def _is_currently_effective(cls, metadata: Dict[str, Any]) -> bool:
+        # Chroma 的 where 已过滤 approved + published；这里保留缺字段兼容，
+        # 以便旧客户端/测试 doubles 在不实现 where 时仍能读取历史结果。
+        if "approval_status" in metadata and metadata.get("approval_status") != "approved":
+            return False
+        if "publication_status" in metadata and metadata.get("publication_status") != "published":
+            return False
+        now = datetime.now(timezone.utc)
+        try:
+            if metadata.get("effective_from") and cls._parse_datetime(metadata["effective_from"], "effective_from") > now:
+                return False
+            if metadata.get("effective_to") and cls._parse_datetime(metadata["effective_to"], "effective_to") <= now:
+                return False
+        except ValueError:
+            return False
+        return True
 
     def _load_default_docs(self) -> None:
         """导入默认知识库文档（客服场景常见问题）。"""
@@ -307,5 +440,12 @@ class KnowledgeBase:
                 ),
             },
         ]
+        for doc in default_docs:
+            doc.update({
+                "product_id": "lumendesk-demo",
+                "tenant_scope": "global",
+                "approval_status": "approved",
+                "publication_status": "published",
+            })
         self.add_documents(default_docs)
         logger.info(f"已导入默认知识库: {len(default_docs)} 篇文档")

@@ -298,6 +298,10 @@ class ChatRequest(BaseModel):
     client_request_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     user_id:     str = "anonymous"
     conv_id:     Optional[str] = None
+    product_id:  str = Field(default="lumendesk-support-cloud", min_length=1, max_length=128)
+    region:      str = Field(default="AU", min_length=1, max_length=128)
+    channel:     str = Field(default="web", min_length=1, max_length=128)
+    tenant_scope: str = Field(default="global", min_length=1, max_length=128)
 
 
 class ChatResponse(BaseModel):
@@ -323,6 +327,9 @@ class ChatResponse(BaseModel):
     status: Literal["success", "partial", "failed"] = "success"
     retryable: bool = False
     error_code: Optional[str] = None
+    grounding_status: Literal["grounded", "insufficient_evidence", "conflict", "expired", "not_applicable"] = "not_applicable"
+    citations: List[Dict[str, Any]] = Field(default_factory=list)
+    knowledge_scope: Dict[str, str] = Field(default_factory=dict)
     performance: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -423,6 +430,10 @@ async def chat(req: ChatRequest, http_request: HTTPRequest):
                 urgency=intent_result.urgency,
                 intent_confidence=intent_result.confidence,
                 conversation_state=getattr(mem_ctx, "state", {}),
+                product_id=req.product_id,
+                region=req.region,
+                channel=req.channel,
+                tenant_scope=req.tenant_scope,
             )
 
             async def before_unsafe_tool(name):
@@ -462,6 +473,14 @@ async def chat(req: ChatRequest, http_request: HTTPRequest):
                 status=result.status,
                 retryable=result.retryable,
                 error_code=result.error_code,
+                grounding_status=result.grounding_status,
+                citations=list(result.citations),
+                knowledge_scope={
+                    "product_id": orch_req.product_id,
+                    "region": orch_req.region,
+                    "channel": orch_req.channel,
+                    "tenant_scope": orch_req.tenant_scope,
+                },
                 performance=performance_snapshot(),
             )
             await _memory.commit_turn(req.user_id, conv_id, client_id, req.message, response.model_dump(),
@@ -512,15 +531,50 @@ async def prometheus_metrics():
 
 
 @app.post("/search")
-async def search(query: str = Query(min_length=1, max_length=2000), top_k: int = Query(default=5, ge=1, le=20)):
+async def search(
+    query: str = Query(min_length=1, max_length=2000),
+    top_k: int = Query(default=5, ge=1, le=20),
+    product_id: str = Query(default="lumendesk-support-cloud", min_length=1, max_length=128),
+    region: str = Query(default="AU", min_length=1, max_length=128),
+    channel: str = Query(default="web", min_length=1, max_length=128),
+    tenant_scope: str = Query(default="global", min_length=1, max_length=128),
+):
     """
     演示检索优化链路：查询改写 → 并行召回 → 重排 → Top-K。
     展示 MCP 工具调用的核心亮点。
     """
     if _tool_manager is None:
         raise HTTPException(503, "服务未就绪")
-    result = await _tool_manager.search_with_rewrite("knowledge_search", query, top_k=top_k)
-    return {"query": query, "results": result.data, "reranked": result.reranked, "cached": result.cached}
+    filters = {
+        key: value for key, value in {
+            "product_id": product_id,
+            "region": region,
+            "channel": channel,
+            "tenant_scope": tenant_scope,
+        }.items() if value
+    }
+    result = await _tool_manager.search_with_rewrite(
+        "knowledge_search", query, top_k=top_k,
+        context={"knowledge_filters": filters},
+    )
+    results = result.data if isinstance(result.data, list) else []
+    return {
+        "query": query,
+        "results": results,
+        "reranked": result.reranked,
+        "cached": result.cached,
+        "grounding_status": "grounded" if results else "insufficient_evidence",
+        "citations": [
+            {
+                "document_id": item.get("document_id", ""),
+                "title": item.get("title", ""),
+                "source_url": item.get("source_url", ""),
+                "version": item.get("version", ""),
+            }
+            for item in results if isinstance(item, dict)
+        ],
+        "knowledge_scope": filters,
+    }
 
 
 class DocInput(BaseModel):
@@ -528,6 +582,24 @@ class DocInput(BaseModel):
     title:   str
     content: str
     document_id: Optional[str] = None
+    product_id: Optional[str] = Field(default=None, max_length=128)
+    region: Optional[str] = Field(default=None, max_length=128)
+    channel: Optional[str] = Field(default=None, max_length=128)
+    tenant_scope: Optional[str] = Field(default=None, max_length=128)
+    source_url: Optional[str] = Field(default=None, max_length=2048)
+    source_title: Optional[str] = Field(default=None, max_length=500)
+    source_hash: Optional[str] = Field(default=None, max_length=128)
+    approval_status: Literal["draft", "approved", "rejected", "retired"] = "draft"
+    publication_status: Literal["unpublished", "published", "withdrawn"] = "unpublished"
+    effective_from: Optional[str] = Field(default=None, max_length=64)
+    effective_to: Optional[str] = Field(default=None, max_length=64)
+    fetched_at: Optional[str] = Field(default=None, max_length=64)
+    published_at: Optional[str] = Field(default=None, max_length=64)
+    reviewer: Optional[str] = Field(default=None, max_length=128)
+    reviewed_at: Optional[str] = Field(default=None, max_length=64)
+    adapted_from_document_id: Optional[str] = Field(default=None, max_length=128)
+    policy_type: Optional[str] = Field(default=None, max_length=128)
+    locale: Optional[str] = Field(default=None, max_length=32)
 
 
 class BatchDocInput(BaseModel):

@@ -142,7 +142,8 @@ def test_agent_tool_scopes_are_real_and_isolated():
 
 def test_shared_rag_tool_is_available_to_all_agents():
     class RagManager:
-        async def search_with_rewrite(self, tool_name, query, top_k=5):
+        async def search_with_rewrite(self, tool_name, query, top_k=5, context=None):
+            self.context = context
             return type(
                 "Result",
                 (),
@@ -160,6 +161,48 @@ def test_shared_rag_tool_is_available_to_all_agents():
         agent.set_shared_tools(shared)
         tools = agent.get_tools()
         assert "search_knowledge_base" in tools
+
+
+def test_rag_tool_passes_product_scope_and_returns_grounding_contract():
+    class RagManager:
+        def __init__(self):
+            self.context = None
+
+        async def search_with_rewrite(self, tool_name, query, top_k=5, context=None):
+            self.context = context
+            return type(
+                "Result",
+                (),
+                {
+                    "success": True,
+                    "data": [{
+                        "document_id": "policy-1",
+                        "title": "退款政策",
+                        "content": "LumenDesk 退款说明",
+                        "version": "v2",
+                        "source_url": "https://example.test/refund",
+                        "chunk": 0,
+                    }],
+                    "reranked": False,
+                    "cached": False,
+                },
+            )()
+
+    manager = RagManager()
+    req = make_request(product_id="lumendesk-pro", region="AU", channel="web", tenant_scope="demo")
+    spec = build_shared_rag_tools(manager)["search_knowledge_base"]
+    result = asyncio.run(spec.handler(req, {"query": "退款政策"}))
+
+    assert manager.context == {"knowledge_filters": {
+        "product_id": "lumendesk-pro",
+        "region": "AU",
+        "channel": "web",
+        "tenant_scope": "demo",
+    }}
+    assert result["grounding_status"] == "grounded"
+    assert result["context"] == manager.context
+    assert result["citations"][0]["policy_version"] == "v2"
+    assert result["citations"][0]["source_url"] == "https://example.test/refund"
 
 
 def test_tool_input_validation_rejects_unknown_fields():

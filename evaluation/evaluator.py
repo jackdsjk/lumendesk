@@ -526,6 +526,10 @@ class EndToEndEvaluator:
                 context=context,
                 history=history[-6:] if history else None,
                 conversation_state=state,
+                product_id=str(case.get("product_id", "") or ""),
+                region=str(case.get("region", "") or ""),
+                channel=str(case.get("channel", "") or ""),
+                tenant_scope=str(case.get("tenant_scope", "") or ""),
             )
             orch_result = await self._orchestrator.run(orch_req)
             state = orch_req.conversation_state or {}
@@ -542,6 +546,29 @@ class EndToEndEvaluator:
                 if case.get("expected_entities"):
                     checks["entities"] = all(set(values) <= set(orch_req.entities.get(key, []))
                                               for key, values in case["expected_entities"].items())
+                if case.get("expected_grounding_status"):
+                    checks["grounding_status"] = (
+                        getattr(orch_result, "grounding_status", "not_applicable")
+                        == case["expected_grounding_status"]
+                    )
+                if "expected_escalation" in case:
+                    checks["escalation"] = bool(getattr(orch_result, "escalated", False)) == bool(case["expected_escalation"])
+                if case.get("required_citations"):
+                    citations = getattr(orch_result, "citations", []) or []
+                    checks["citations"] = all(
+                        any(
+                            required == citation.get("document_id")
+                            or required == citation.get("title")
+                            or required == citation.get("source_url")
+                            or required == citation.get("policy_version")
+                            for citation in citations
+                        )
+                        for required in case["required_citations"]
+                    )
+                if case.get("forbidden_claims"):
+                    checks["forbidden_claims"] = all(
+                        str(claim) not in actual_answer for claim in case["forbidden_claims"]
+                    )
 
             judge_context = context
             for label, field in [("参考答案", "reference_answer"), ("核验资料", "evidence")]:
@@ -587,6 +614,14 @@ class EndToEndEvaluator:
                     "deterministic_checks": checks,
                     "scope": "orchestrator",
                     "entities": orch_req.entities,
+                    "grounding_status": getattr(orch_result, "grounding_status", "not_applicable"),
+                    "citations": list(getattr(orch_result, "citations", []) or []),
+                    "knowledge_scope": {
+                        "product_id": orch_req.product_id,
+                        "region": orch_req.region,
+                        "channel": orch_req.channel,
+                        "tenant_scope": orch_req.tenant_scope,
+                    },
                 },
             ))
 

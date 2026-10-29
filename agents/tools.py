@@ -27,6 +27,66 @@ if TYPE_CHECKING:
 
 AgentToolHandler = Callable[["Request", Dict[str, Any]], Union[Any, Awaitable[Any]]]
 
+GROUNDING_STATUSES = {
+    "grounded",
+    "insufficient_evidence",
+    "conflict",
+    "expired",
+    "not_applicable",
+}
+
+
+def knowledge_context(req: Request) -> Dict[str, Any]:
+    """构造可信的知识检索范围；范围来自请求，不由模型自行猜测。"""
+    scope = {
+        "product_id": str(getattr(req, "product_id", "") or "").strip(),
+        "region": str(getattr(req, "region", "") or "").strip(),
+        "channel": str(getattr(req, "channel", "") or "").strip(),
+        "tenant_scope": str(getattr(req, "tenant_scope", "") or "").strip(),
+    }
+    return {"knowledge_filters": scope}
+
+
+def _grounding_status(results: Any) -> str:
+    """从知识库结果中归一化证据状态；旧结果无状态时仅把非空结果视为 grounded。"""
+    if not isinstance(results, list) or not results:
+        return "insufficient_evidence"
+    statuses = {
+        str(item.get("grounding_status") or item.get("status") or "").strip().lower()
+        for item in results
+        if isinstance(item, dict)
+    }
+    statuses.discard("")
+    if "conflict" in statuses:
+        return "conflict"
+    if "expired" in statuses and statuses <= {"expired"}:
+        return "expired"
+    if statuses & {"draft", "rejected", "withdrawn", "unpublished"}:
+        return "insufficient_evidence"
+    if "insufficient_evidence" in statuses:
+        return "insufficient_evidence"
+    return "grounded"
+
+
+def _citations(results: Any) -> List[Dict[str, Any]]:
+    """把检索片段映射为稳定、可供 Agent 和评测使用的引用结构。"""
+    if not isinstance(results, list):
+        return []
+    citations: List[Dict[str, Any]] = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        citations.append({
+            "document_id": item.get("document_id", ""),
+            "title": item.get("title", ""),
+            "source_url": item.get("source_url", ""),
+            "policy_version": item.get("policy_version") or item.get("version", ""),
+            "effective_from": item.get("effective_from", ""),
+            "excerpt": item.get("excerpt") or item.get("content", ""),
+            "chunk_id": item.get("chunk_id") or item.get("chunk", ""),
+        })
+    return citations
+
 
 @dataclass(frozen=True)
 class AgentToolSpec:
@@ -183,14 +243,29 @@ def build_shared_rag_tools(tool_manager: Any) -> Dict[str, AgentToolSpec]:
         query = str(args.get("query") or req.message or "").strip()
         top_k = args.get("top_k", 5)
         if not query:
-            return {"success": False, "error": "query 不能为空", "results": []}
+            return {
+                "success": False,
+                "error": "query 不能为空",
+                "results": [],
+                "context": knowledge_context(req),
+                "grounding_status": "insufficient_evidence",
+                "citations": [],
+            }
         if tool_manager is None:
-            return {"success": False, "error": "RAG 工具未初始化", "results": []}
+            return {
+                "success": False,
+                "error": "RAG 工具未初始化",
+                "results": [],
+                "context": knowledge_context(req),
+                "grounding_status": "insufficient_evidence",
+                "citations": [],
+            }
 
         result = await tool_manager.search_with_rewrite(
             "knowledge_search",
             query,
             top_k=top_k,
+            context=knowledge_context(req),
         )
         if not getattr(result, "success", False):
             return {
@@ -198,6 +273,9 @@ def build_shared_rag_tools(tool_manager: Any) -> Dict[str, AgentToolSpec]:
                 "query": query,
                 "error": getattr(result, "error", "知识库检索失败"),
                 "results": [],
+                "context": knowledge_context(req),
+                "grounding_status": "insufficient_evidence",
+                "citations": [],
                 "reranked": False,
             }
 
@@ -206,6 +284,9 @@ def build_shared_rag_tools(tool_manager: Any) -> Dict[str, AgentToolSpec]:
             "query": query,
             "top_k": top_k,
             "results": result.data,
+            "context": knowledge_context(req),
+            "grounding_status": _grounding_status(result.data),
+            "citations": _citations(result.data),
             "cached": bool(getattr(result, "cached", False)),
             "reranked": bool(getattr(result, "reranked", False)),
         }

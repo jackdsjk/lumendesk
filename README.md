@@ -304,7 +304,11 @@ docker compose exec -T lumendesk python scripts/check_embedding.py
 {
   "message": "登录时提示401错误，应该怎么处理？",
   "user_id": "demo_user",
-  "client_request_id": "demo-login-001"
+  "client_request_id": "demo-login-001",
+  "product_id": "lumendesk-support-cloud",
+  "region": "AU",
+  "channel": "web",
+  "tenant_scope": "global"
 }
 ```
 
@@ -320,6 +324,8 @@ docker compose exec -T lumendesk python scripts/check_embedding.py
 | `intent_confidence`、`intent_source_scores` | 排查三路识别结果。 |
 | `primary_agent`、`supporting_agents`、`routing_reason` | 了解主辅 Agent 的选择和路由依据。 |
 | `tools_used`、`knowledge_used` | 查看工具使用情况；后者仅在知识库工具实际成功时为 true。 |
+| `grounding_status`、`citations` | 查看回答是否有已发布依据，以及来源 URL、版本和片段引用。`insufficient_evidence`、`conflict`、`expired` 会触发保守说明或升级。 |
+| `knowledge_scope` | 查看本轮知识范围：产品、地区、渠道和租户。 |
 | `intent_embedding_source` | 确认本次向量分支使用在线模型还是本地 n-gram。 |
 | `performance` | 本轮记忆读取、意图和 Agent 执行耗时，以及模型逻辑调用数、供应商返回的 token 用量和检索缓存事件；不包含问题正文。 |
 | `status` | `success` 为完整回复，`partial` 表示回复截断或仅部分 Agent 成功，`failed` 为执行失败。 |
@@ -354,12 +360,18 @@ docker compose exec -T lumendesk python scripts/check_embedding.py
 }
 ```
 
+知识库治理演示默认使用 `LumenDesk Support Cloud`。生产检索只接受同时满足 `approval_status=approved`、`publication_status=published`、当前产品/地区/渠道/租户范围和生效时间的文档；未审核文档默认是 `draft + unpublished`。来源登记、改写草案和安全边界见 [knowledge-governance](wiki/knowledge-governance/README.md)。
+
+演示产品的资料链路是：官方公开参考 → 来源登记与 hash → LumenDesk 自有改写草案 → 人工审核 → 受控导入。第三方来源不会直接成为 LumenDesk 政策；当前演示的退款窗口、套餐和客服时段均为自定义占位值。
+
+本地演示发布已固化为显式命令：`python scripts/publish_demo_knowledge.py --approve-demo`。没有 `--approve-demo` 时脚本只会拒绝发布，避免把草案误写入知识库。
+
 - 相同 `document_id` 表示更新同一文档；不传时按标题识别文档，同标题导入会覆盖。
 - 同名不同来源的文档应指定不同 `document_id`。同批次相同身份保留最后一个版本。
 - 文档会切片、向量化；更新会删除多余旧片段，并使相关检索缓存失效。接口返回的数量是**片段数**。
 - `POST /knowledge/upload` 支持 txt、md、json，单文件最大 10 MB；JSON 格式可在 Swagger 查看。
 - `GET /knowledge/stats` 查看片段总数。
-- `POST /search` 使用查询参数 `query`、`top_k`，用于独立验证检索效果，不需要先经过 Agent 路由。
+- `POST /search` 使用查询参数 `query`、`top_k`、`product_id`、`region`、`channel`、`tenant_scope`，用于独立验证检索效果，不需要先经过 Agent 路由。
 - `query` 最多 2000 字符，`top_k` 范围为 1–20；检索结果保留文档 ID、内容版本和片段位置。
 
 先验证 `/search` 能召回文档，再通过 `/chat` 检查 Agent 是否按问题调用了知识库工具。
