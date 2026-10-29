@@ -298,7 +298,7 @@ class ChatRequest(BaseModel):
     client_request_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     user_id:     str = "anonymous"
     conv_id:     Optional[str] = None
-    product_id:  str = Field(default="lumendesk-support-cloud", min_length=1, max_length=128)
+    product_id:  str = Field(default="halex-support-cloud", min_length=1, max_length=128)
     region:      str = Field(default="AU", min_length=1, max_length=128)
     channel:     str = Field(default="web", min_length=1, max_length=128)
     tenant_scope: str = Field(default="global", min_length=1, max_length=128)
@@ -534,7 +534,7 @@ async def prometheus_metrics():
 async def search(
     query: str = Query(min_length=1, max_length=2000),
     top_k: int = Query(default=5, ge=1, le=20),
-    product_id: str = Query(default="lumendesk-support-cloud", min_length=1, max_length=128),
+    product_id: str = Query(default="halex-support-cloud", min_length=1, max_length=128),
     region: str = Query(default="AU", min_length=1, max_length=128),
     channel: str = Query(default="web", min_length=1, max_length=128),
     tenant_scope: str = Query(default="global", min_length=1, max_length=128),

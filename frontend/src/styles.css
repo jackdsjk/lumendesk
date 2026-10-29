@@ -175,6 +175,24 @@ pre { margin: 10px 0 0; padding: 12px; background: var(--soft); border: 1px soli
 .user .message-content p { font-size: 14px; line-height: 1.85; }
 .agent-tag { display: inline-flex; align-items: center; gap: 6px; color: #9999a2; margin-top: 13px; font-size: 10px; overflow-wrap: anywhere; }
 .agent-tag .icon { width: 12px; height: 12px; }
+.evidence-card { margin-top: 15px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 9px; background: #fafafa; font-size: 11px; }
+.evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--faint); }
+.evidence-status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 550; }
+.evidence-status i { width: 6px; height: 6px; border-radius: 50%; background: #a4a4ad; }
+.evidence-status.status-grounded { color: var(--success); }
+.evidence-status.status-grounded i { background: var(--success); }
+.evidence-status.status-conflict, .evidence-status.status-expired, .evidence-status.status-insufficient_evidence { color: #a56d4b; }
+.evidence-status.status-conflict i, .evidence-status.status-expired i, .evidence-status.status-insufficient_evidence i { background: #b48e66; }
+.scope-tags, .search-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+.scope-tags span, .scope-chip { padding: 3px 6px; border-radius: 4px; color: var(--muted); background: white; border: 1px solid var(--line); }
+.citation-list { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.citation-list summary { display: flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; list-style: none; }
+.citation-list summary .icon { width: 11px; height: 11px; margin-left: auto; }
+.citation-list[open] summary .icon { transform: rotate(90deg); }
+.citation-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); }
+.citation-item strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: #62626e; }
+.citation-item a { color: #65656d; text-decoration: underline; text-underline-offset: 2px; }
+.citation-item small { grid-column: 1 / -1; color: var(--faint); }
 .message-trace { margin-top: 13px; font-size: 12px; }
 .message-trace summary { display: flex; align-items: center; gap: 7px; color: var(--muted); cursor: pointer; list-style: none; min-height: 28px; }
 .message-trace summary .icon { width: 12px; height: 12px; }
@@ -266,6 +284,8 @@ summary::-webkit-details-marker { display: none; }
 .result-title strong { font-size: 13px; font-weight: 550; }
 .result-title small { font-size: 10px; color: var(--faint); }
 .result-item p { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.95; white-space: pre-wrap; overflow-wrap: anywhere; }
+.result-source { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 10px; color: var(--faint); font-size: 10px; }
+.result-source a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
 .workspace-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 295px; padding: 20px; text-align: center; }
 .workspace-empty .icon { width: 30px; height: 30px; color: #bdbdc6; margin-bottom: 18px; }
 .workspace-empty h3 { font-size: 15px; font-weight: 500; color: #75757f; }

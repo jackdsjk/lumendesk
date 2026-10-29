@@ -365,7 +365,68 @@ class BaseAgent:
         def _clean(s: str) -> str:
             return s.encode("utf-8", errors="ignore").decode("utf-8")
 
-        messages = []
+        tools = self.get_tools()
+        tools_used: List[str] = []
+        tool_traces: List[Dict[str, Any]] = []
+        grounding_status = "not_applicable"
+        citations: List[Dict[str, Any]] = []
+
+        # 先检索一次已审核知识，再交给模型作答。这样客服不会因为模型
+        # 忘记主动调用工具而丢失证据；问候和正向反馈不强行检索。
+        if "search_knowledge_base" in tools and req.intent not in {
+            IntentCategory.GREETING,
+            IntentCategory.FEEDBACK,
+        }:
+            spec = tools["search_knowledge_base"]
+            prefetch_t0 = time.monotonic()
+            try:
+                prefetch = spec.handler(req, {"query": req.message, "top_k": 5})
+                if inspect.isawaitable(prefetch):
+                    prefetch = await prefetch
+                if isinstance(prefetch, dict):
+                    grounding_status = _merge_grounding_status(
+                        grounding_status, prefetch.get("grounding_status")
+                    )
+                    citations.extend(prefetch.get("citations") or [])
+                    tools_used.append("search_knowledge_base")
+                    tool_traces.append({
+                        "agent_type": self.agent_type.value,
+                        "tool_name": "search_knowledge_base",
+                        "tool_use_id": None,
+                        "input": {"query": req.message, "top_k": 5},
+                        "success": bool(prefetch.get("success")),
+                        "result_success": bool(prefetch.get("success")),
+                        "latency_ms": round((time.monotonic() - prefetch_t0) * 1000, 1),
+                        "cached": bool(prefetch.get("cached")),
+                        "reranked": bool(prefetch.get("reranked")),
+                        "error": str(prefetch.get("error", "") or ""),
+                        "source": prefetch.get("source", "local"),
+                        "mcp_server": prefetch.get("mcp_server"),
+                        "mcp_tool": prefetch.get("mcp_tool"),
+                        "retry_safe": True,
+                        "grounding_status": prefetch.get("grounding_status"),
+                        "citations": list(prefetch.get("citations") or []),
+                    })
+                    evidence = prefetch.get("results") or []
+                    if evidence:
+                        messages_evidence = json.dumps(evidence[:5], ensure_ascii=False)
+                    else:
+                        messages_evidence = "当前范围没有已审核且已发布的匹配资料。"
+                else:
+                    messages_evidence = "知识库返回格式无效，不能作为回答依据。"
+            except Exception as ex:
+                logger.warning("预检索知识库失败: %s", ex)
+                grounding_status = _merge_grounding_status(
+                    grounding_status, "insufficient_evidence"
+                )
+                messages_evidence = "知识库暂时不可用，不能把未核验信息当作政策承诺。"
+            messages = [{
+                "role": "user",
+                "content": f"[已审核知识库证据]\n{messages_evidence}",
+            }]
+            messages.append({"role": "assistant", "content": "好的，我会优先依据这些资料回答。"})
+        else:
+            messages = []
         if req.context:
             messages.append({"role": "user", "content": f"[背景信息]\n{_clean(req.context)}"})
             messages.append({"role": "assistant", "content": "好的，我已了解背景信息。"})
@@ -378,11 +439,6 @@ class BaseAgent:
             messages.append({"role": "user", "content": f"[结构化实体]\n{_clean(entities_text)}"})
         messages.append({"role": "user", "content": _clean(req.message)})
 
-        tools = self.get_tools()
-        tools_used: List[str] = []
-        tool_traces: List[Dict[str, Any]] = []
-        grounding_status = "not_applicable"
-        citations: List[Dict[str, Any]] = []
         try:
             for _ in range(3):
                 request_kwargs: Dict[str, Any] = {

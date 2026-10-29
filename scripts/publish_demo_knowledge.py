@@ -45,7 +45,7 @@ def load_documents(registry_path: Path, draft_path: Path, reviewer: str) -> list
             "document_id": draft["document_id"],
             "title": draft["title"],
             "content": draft["content"],
-            "product_id": draft["product_id"],
+            "product_id": "halex-support-cloud",
             "region": "AU",
             "channel": "web",
             "tenant_scope": "global",

@@ -22,6 +22,8 @@ from typing import Any, Dict, List, Optional
 
 import chromadb
 
+from core.embeddings import DemoEmbeddingFunction
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,9 +31,8 @@ class KnowledgeBase:
     """
     基于 ChromaDB 的 RAG 知识库。
 
-    ChromaDB 内置了 Embedding 模型（all-MiniLM-L6-v2），
-    调用 add() 时自动生成向量，query() 时自动做语义匹配。
-    不需要额外调用 Anthropic Embeddings API。
+    使用项目内置的离线演示 embedding，调用 add() 时自动生成向量，
+    query() 时自动做相似度匹配；不依赖外部模型下载或 Anthropic Embeddings API。
     """
 
     COLLECTION_NAME = "knowledge_base"
@@ -50,7 +51,7 @@ class KnowledgeBase:
         chroma_port: int = 8000,
         chroma_path: str = "./data/chroma",
     ):
-        # 优先连接独立 ChromaDB 服务；默认 embedding_function 在客户端生成向量。
+        # 优先连接独立 ChromaDB 服务；embedding_function 在客户端生成向量。
         self._write_lock = threading.RLock()
         self._use_server = False
         try:
@@ -72,10 +73,11 @@ class KnowledgeBase:
                 settings=chromadb.Settings(anonymized_telemetry=False),
             )
 
-        # 不传 embedding_function 时使用 ChromaDB 客户端默认模型；
-        # Docker 已预下载模型，本地运行首次使用可能触发下载。
+        # 显式使用离线演示 embedding，避免首个请求触发外部模型下载。
+        self._embedding_function = DemoEmbeddingFunction()
         self._collection = self._client.get_or_create_collection(
             name=self.COLLECTION_NAME,
+            embedding_function=self._embedding_function,
             metadata={"description": "LumenDesk RAG 知识库"},
         )
 

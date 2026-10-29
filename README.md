@@ -211,9 +211,9 @@ docker compose up -d --build lumendesk
 | 用途 | 模型与存储 |
 |---|---|
 | 三路意图识别中的向量匹配 | 默认本地字符 n-gram，可配置硅基流动 `BAAI/bge-m3`。 |
-| RAG 知识库及 ChromaDB 记忆检索 | 使用 ChromaDB 默认的本地 `all-MiniLM-L6-v2` 向量模型。 |
+| RAG 知识库及 ChromaDB 记忆检索 | 使用项目内置的离线 384 维特征哈希向量，演示环境无需下载模型。 |
 
-本节只配置**意图识别的向量分支**，不会替换 RAG 模型，也不需要重建知识库。硅基流动的免费模型范围、账号权限和限流以[官方价格页](https://siliconflow.cn/pricing)为准；项目固定使用非 Pro 的 `BAAI/bge-m3`，不会自动切换到 `Pro/BAAI/bge-m3`。聊天及评测的 LLM 费用由对应服务商计算。
+本节只配置**意图识别的向量分支**，不会替换 RAG 检索，也不需要重建知识库。硅基流动的免费模型范围、账号权限和限流以[官方价格页](https://siliconflow.cn/pricing)为准；项目固定使用非 Pro 的 `BAAI/bge-m3`，不会自动切换到 `Pro/BAAI/bge-m3`。聊天及评测的 LLM 费用由对应服务商计算。
 
 ### 1. 申请 Key 并填写配置
 

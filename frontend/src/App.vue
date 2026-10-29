@@ -103,6 +103,25 @@
                       <AppIcon name="route" />
                       {{ item.meta }}
                     </span>
+                    <section v-if="item.role === 'assistant' && !item.error && item.groundingStatus" class="evidence-card" aria-label="回答依据">
+                      <div class="evidence-heading">
+                        <span class="evidence-status" :class="`status-${item.groundingStatus}`">
+                          <i></i>{{ groundingLabel(item.groundingStatus) }}
+                        </span>
+                        <span v-if="item.citations?.length">{{ item.citations.length }} 条依据</span>
+                      </div>
+                      <div v-if="item.knowledgeScope" class="scope-tags">
+                        <span v-for="scope in scopeEntries(item.knowledgeScope)" :key="scope.key">{{ scope.label }}：{{ scope.value }}</span>
+                      </div>
+                      <details v-if="item.citations?.length" class="citation-list">
+                        <summary>查看来源与版本 <AppIcon name="chevron" /></summary>
+                        <div v-for="(citation, index) in item.citations" :key="`${item.id}-citation-${index}`" class="citation-item">
+                          <strong>{{ citation.title || citation.document_id || '知识片段' }}</strong>
+                          <a v-if="citation.source_url" :href="citation.source_url" target="_blank" rel="noreferrer">打开来源</a>
+                          <small>版本 {{ citation.policy_version || citation.version || '—' }}</small>
+                        </div>
+                      </details>
+                    </section>
                     <details v-if="item.trace?.toolCalls?.length || item.trace?.toolsUsed?.length" class="message-trace">
                       <summary>
                         <AppIcon name="chevron" />
@@ -176,7 +195,7 @@
                   <AppIcon :name="prompt.label === '退款申请' ? 'route' : prompt.label === '技术排查' ? 'sliders' : 'document'" />
                   <span>
                     <strong>{{ prompt.label }}</strong>
-                    <small>{{ prompt.label === '退款申请' ? '了解订单与售后流程' : prompt.label === '技术排查' ? '排查登录与使用问题' : '解答开票相关问题' }}</small>
+                    <small>{{ prompt.description }}</small>
                   </span>
                   <AppIcon class="prompt-arrow" name="northeast" />
                 </button>
@@ -221,6 +240,12 @@
                 {{ busy && pendingAction === 'search' ? '检索中' : '搜索' }}
               </button>
             </form>
+            <div v-if="searchEvidence" class="search-evidence" aria-label="检索依据">
+              <span class="evidence-status" :class="`status-${searchEvidence.status}`">
+                <i></i>{{ groundingLabel(searchEvidence.status) }}
+              </span>
+              <span v-for="scope in scopeEntries(searchEvidence.scope)" :key="scope.key" class="scope-chip">{{ scope.label }}：{{ scope.value }}</span>
+            </div>
             <div v-if="searchResults.length" class="result-list">
               <article v-for="(item, index) in searchResults" :key="item.id || index" class="result-item">
                 <span class="result-number">{{ String(index + 1).padStart(2, '0') }}</span>
@@ -230,6 +255,11 @@
                     <small>相关度 {{ item.score ?? '—' }}</small>
                   </div>
                   <p>{{ item.content }}</p>
+                  <div v-if="item.source_url || item.source_title" class="result-source">
+                    <a v-if="item.source_url" :href="item.source_url" target="_blank" rel="noreferrer">{{ item.source_title || '查看来源' }}</a>
+                    <span v-else>{{ item.source_title }}</span>
+                    <span>{{ item.approval_status === 'approved' && item.publication_status === 'published' ? '已发布' : '未发布' }}</span>
+                  </div>
                 </div>
               </article>
             </div>
@@ -486,6 +516,7 @@ const statusText = ref('')
 const knowledgeCount = ref('-')
 const searchQuery = ref('退款多久能到账')
 const searchResults = ref([])
+const searchEvidence = ref(null)
 const docTitle = ref('')
 const docContent = ref('')
 const messageList = ref(null)
@@ -501,9 +532,9 @@ const views = [
   { id: 'evaluation', label: '评测', icon: 'chart' }
 ]
 const prompts = [
-  { label: '退款申请', text: '我想申请退款，订单号是 #12345' },
-  { label: '技术排查', text: '登录时提示错误，应该怎么排查？' },
-  { label: '发票咨询', text: '发票多久可以开具？' }
+  { label: '退款申请', text: '我想申请退款，订单号是 #12345', description: '了解订单与售后流程' },
+  { label: '账户安全', text: '修改付款信息时需要怎样验证？', description: '确认敏感操作的验证要求' },
+  { label: '技术排查', text: '登录时提示错误，应该怎么排查？', description: '排查登录与使用问题' }
 ]
 const currentView = computed(() => views.find(view => view.id === activeView.value))
 const monitorData = ref({ agent_stats: {}, tool_stats: {}, active_alerts: [], suggestions: [] })
@@ -527,6 +558,23 @@ onBeforeUnmount(() => {
 })
 
 function persist() { saveSettings(settings) }
+
+function groundingLabel(status) {
+  return {
+    grounded: '有依据',
+    insufficient_evidence: '依据不足',
+    conflict: '政策冲突',
+    expired: '依据过期',
+    not_applicable: '未使用知识库'
+  }[status] || '依据未知'
+}
+
+function scopeEntries(scope) {
+  const labels = { product_id: '产品', region: '地区', channel: '渠道', tenant_scope: '范围' }
+  return Object.entries(scope || {})
+    .filter(([, value]) => value)
+    .map(([key, value]) => ({ key, label: labels[key] || key, value }))
+}
 
 function performAction(name, action, ...args) {
   if (busy.value) return
@@ -682,7 +730,16 @@ async function sendMessage() {
     lastResponse.value = response
     lastTrace.value = trace
     const meta = [response.intent, response.primaryAgent || response.agentType, response.knowledgeUsed ? 'RAG' : '', response.escalated ? '转人工' : ''].filter(Boolean).join(' · ')
-    messages.value.push({ id: createMessageId(), role: 'assistant', content: response.response, meta, trace: lastTrace.value?.trace || null })
+    messages.value.push({
+      id: createMessageId(),
+      role: 'assistant',
+      content: response.response,
+      meta,
+      trace: lastTrace.value?.trace || null,
+      groundingStatus: response.groundingStatus,
+      citations: response.citations,
+      knowledgeScope: response.knowledgeScope
+    })
     await loadMonitor()
   } catch (error) {
     if (!request.isCurrent()) return
@@ -703,6 +760,7 @@ function clearConversation() {
   messages.value = []
   lastResponse.value = null
   lastTrace.value = null
+  searchEvidence.value = null
   settings.conversationId = ''
   persist()
 }
@@ -715,6 +773,11 @@ async function searchKnowledge() {
     const data = await requestSearch(request.backend, request.settings, searchQuery.value, 5)
     if (!request.isCurrent()) return
     searchResults.value = data.results || []
+    searchEvidence.value = {
+      status: data.grounding_status || (searchResults.value.length ? 'grounded' : 'insufficient_evidence'),
+      citations: data.citations || [],
+      scope: data.knowledge_scope || {}
+    }
     searched.value = true
     showToast(`检索完成，返回 ${searchResults.value.length} 条结果`)
   } catch (error) {

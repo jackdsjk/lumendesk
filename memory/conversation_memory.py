@@ -9,7 +9,7 @@
 关键设计：
   - 上下文构建时三级记忆融合，按重要性 + 时效性排序
   - 工作记忆超过阈值时自动压缩（LLM 摘要），防止 context 爆炸
-  - Embedding 由 ChromaDB 默认模型生成，LLM 用于摘要和画像提炼
+  - Embedding 由项目内置的离线演示函数生成，LLM 用于摘要和画像提炼
 """
 import hashlib
 import asyncio
@@ -32,6 +32,7 @@ from anthropic import AsyncAnthropic
 from core.llm_utils import create_message, extract_text_content
 from core.performance import record_event
 from core.concurrency import KeyedLocks, redis_lease
+from core.embeddings import DemoEmbeddingFunction
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +132,15 @@ class MemoryManager:
                 settings=chromadb.Settings(anonymized_telemetry=False),
             )
 
+        self._embedding_function = DemoEmbeddingFunction()
         # 情景记忆：存储历史对话片段
-        self._episodic = chroma.get_or_create_collection("episodic")
+        self._episodic = chroma.get_or_create_collection(
+            "episodic", embedding_function=self._embedding_function
+        )
         # 用户画像：存储提炼出的偏好和实体
-        self._profile  = chroma.get_or_create_collection("user_profile")
+        self._profile = chroma.get_or_create_collection(
+            "user_profile", embedding_function=self._embedding_function
+        )
 
     @asynccontextmanager
     async def conversation(self, user_id: str, conv_id: str):
@@ -248,7 +254,7 @@ class MemoryManager:
     async def _update_profile(self, user_id: str, conv_id: str) -> bool:
         """
         从当前工作记忆中提炼用户偏好，更新用户画像。
-        用 LLM 提炼偏好，然后存入 ChromaDB（ChromaDB 内置 embedding，不依赖外部 API）。
+        用 LLM 提炼偏好，然后存入 ChromaDB（使用项目内置离线 embedding）。
         """
         user_id = self._safe_text(user_id)
         conv_id = self._safe_text(conv_id)
@@ -283,7 +289,7 @@ class MemoryManager:
             doc_id = self._profile_doc_id(user_id)
             doc_text = self._safe_text(json.dumps(profile_data, ensure_ascii=False))
 
-            # 直接传 documents，让 ChromaDB 内置模型生成 embedding（不依赖 Voyage API）
+            # 直接传 documents，由项目内置离线 embedding 生成向量。
             await asyncio.to_thread(
                 self._profile.upsert,
                 ids=[doc_id],
@@ -413,7 +419,7 @@ class MemoryManager:
         return self._messages_from_raw(raws)
 
     async def _search_episodic(self, user_id: str, conv_id: str, query: str) -> List[str]:
-        """语义检索情景记忆。ChromaDB 内置 embedding，不依赖外部 API。"""
+        """语义检索情景记忆。使用项目内置离线 embedding。"""
         query_text = self._safe_text(query).strip()
         if not query_text:
             return []
@@ -437,14 +443,14 @@ class MemoryManager:
             return []
 
     async def _store_episodic(self, user_id: str, conv_id: str, text: str, summary: str) -> None:
-        """将压缩后的对话片段存入情景记忆。ChromaDB 内置 embedding，不依赖外部 API。"""
+        """将压缩后的对话片段存入情景记忆，使用项目内置离线 embedding。"""
         try:
             user_id = self._safe_text(user_id)
             conv_id = self._safe_text(conv_id)
             text = self._safe_text(text)
             summary = self._safe_text(summary)
             doc_id = hashlib.md5(f"{user_id}{conv_id}{time.time()}".encode()).hexdigest()
-            # 直接传 documents，ChromaDB 内置模型自动生成 embedding
+            # 直接传 documents，由项目内置离线 embedding 自动生成向量。
             await asyncio.to_thread(
                 self._episodic.add,
                 ids=[doc_id],

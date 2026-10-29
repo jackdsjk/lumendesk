@@ -72,7 +72,14 @@ export async function runEvaluation(type, settings, body = null, options = {}) {
 }
 
 export async function requestSearch(type, settings, query, topK = 5) {
-  const params = new URLSearchParams({ query, top_k: String(topK) })
+  const params = new URLSearchParams({
+    query,
+    top_k: String(topK),
+    product_id: 'halex-support-cloud',
+    region: 'AU',
+    channel: 'web',
+    tenant_scope: 'global'
+  })
   return requestFor(type, settings, `/search?${params}`, { method: 'POST' })
 }
 
@@ -121,7 +128,11 @@ function buildChatPayload(type, settings, message) {
   return {
     message,
     user_id: settings.userId || 'anonymous',
-    conv_id: settings.conversationId || undefined
+    conv_id: settings.conversationId || undefined,
+    product_id: 'halex-support-cloud',
+    region: 'AU',
+    channel: 'web',
+    tenant_scope: 'global'
   }
 }
 
@@ -145,6 +156,14 @@ function normalizeChatResponse(type, raw) {
     escalated: Boolean(raw.escalated),
     latencyMs: Number(raw.latency_ms ?? raw.latencyMs ?? 0),
     knowledgeUsed: Boolean(raw.knowledge_used ?? raw.knowledgeUsed),
+    groundingStatus: raw.grounding_status || raw.groundingStatus || 'not_applicable',
+    citations: Array.isArray(raw.citations) ? raw.citations : [],
+    knowledgeScope: raw.knowledge_scope || raw.knowledgeScope || {
+      product_id: 'halex-support-cloud',
+      region: 'AU',
+      channel: 'web',
+      tenant_scope: 'global'
+    },
     verified: raw.verified,
     grounded: raw.grounded,
     raw
