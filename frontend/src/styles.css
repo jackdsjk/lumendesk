@@ -115,6 +115,7 @@ pre { margin: 10px 0 0; padding: 12px; background: var(--soft); border: 1px soli
 .page-breadcrumb strong { font-weight: 500; color: #54545e; }
 .mobile-brand { display: none; }
 .topbar-tools { display: flex; align-items: center; gap: 17px; }
+.demo-badge { color: #1c5c48; background: #e6f1eb; border: 1px solid #cde4d7; border-radius: 999px; padding: 5px 9px; font-size: 10px; white-space: nowrap; }
 .connection-status { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); }
 .connection-status i, .dialog-health i { width: 5px; height: 5px; border-radius: 50%; background: #b1b1b8; flex-shrink: 0; }
 .connection-status .online, .dialog-health .online { background: var(--success); }

@@ -52,6 +52,7 @@
           <span>LumenDesk</span>
         </a>
         <div class="topbar-tools">
+          <span v-if="demoMode" class="demo-badge">GitHub 演示 · 模拟数据</span>
           <span class="connection-status" :title="statusText || healthLabel">
             <i :class="healthOk ? 'online' : 'offline'"></i>
             {{ healthOk ? '已连接' : healthLabel === '未检查' ? '连接中' : '未连接' }}
@@ -535,6 +536,7 @@ import {
   addKnowledge,
   backendMeta,
   createInitialSettings,
+  isDemoMode,
   reloadSkills,
   requestChat,
   requestHealth,
@@ -555,6 +557,7 @@ import RequestInspector from './components/RequestInspector.vue'
 import { createRequestState } from './lib/requestState'
 
 const settings = reactive(createInitialSettings())
+const demoMode = isDemoMode()
 const requestState = createRequestState(settings)
 const activeView = ref('chat')
 const messages = ref([])
