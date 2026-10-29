@@ -585,6 +585,7 @@ const views = [
 ]
 const prompts = [
   { label: '退款申请', text: '我想申请退款，订单号是 #12345', description: '了解订单与售后流程' },
+  { label: '订单查询', text: '帮我查询订单 #12345 的状态和金额', description: '查询演示订单与退款资格' },
   { label: '账户安全', text: '修改付款信息时需要怎样验证？', description: '确认敏感操作的验证要求' },
   { label: '技术排查', text: '登录时提示错误，应该怎么排查？', description: '排查登录与使用问题' }
 ]

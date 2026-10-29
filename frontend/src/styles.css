@@ -244,6 +244,8 @@ summary::-webkit-details-marker { display: none; }
 .inspector-tools[open] summary .icon { transform: rotate(90deg); }
 .inspector-tools > p { margin-top: 13px; font-size: 10px; }
 .trace-call-item { margin-top: 14px; }
+.trace-result { margin-top: 8px; }
+.trace-result > span { color: var(--success); font-size: 10px; }
 .trace-call-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; font-size: 10px; overflow-wrap: anywhere; }
 .trace-call-meta strong { font-weight: 500; min-width: 0; }
 .trace-call-meta span { flex-shrink: 0; }

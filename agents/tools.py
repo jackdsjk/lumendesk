@@ -21,6 +21,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Optional, TYPE_CHECKING, Union, Tuple
 
+from tooling.demo_business import demo_business_service
+
 if TYPE_CHECKING:
     from agents.agent_orchestrator import Request
 
@@ -224,6 +226,26 @@ def compare_amounts(req: Request, args: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def lookup_demo_order(req: Request, args: Dict[str, Any]) -> Dict[str, Any]:
+    """查询隔离的演示订单，不连接真实支付或订单系统。"""
+    return demo_business_service.lookup_order(req.user_id, str(args.get("order_id", "")))
+
+
+def create_demo_refund_ticket(req: Request, args: Dict[str, Any]) -> Dict[str, Any]:
+    """在明确确认后创建内存中的演示退款工单。"""
+    return demo_business_service.create_refund_ticket(
+        req.user_id,
+        str(args.get("order_id", "")),
+        str(args.get("reason", "用户申请退款")),
+        bool(args.get("confirmed", False)),
+    )
+
+
+def lookup_demo_account_security(req: Request, args: Dict[str, Any]) -> Dict[str, Any]:
+    """查询隔离的演示账户安全状态，不读取真实账号。"""
+    return demo_business_service.account_security(req.user_id)
+
+
 def create_handoff_summary(req: Request, args: Dict[str, Any]) -> Dict[str, Any]:
     """升级工具：生成可交给人工客服的结构化摘要。"""
     return {
@@ -319,6 +341,19 @@ def general_tools() -> Dict[str, AgentToolSpec]:
             {},
             suggest_required_fields,
         ),
+        "lookup_account_security": make_tool(
+            "lookup_account_security",
+            "查询当前用户的演示账户安全状态；不会读取或修改真实账户，也不会索要密码或验证码。",
+            {},
+            lookup_demo_account_security,
+        ),
+        "lookup_order": make_tool(
+            "lookup_order",
+            "查询隔离的 lumendesk 演示订单，返回订单状态、金额和退款资格；不连接真实支付系统。",
+            {"order_id": {"type": "string", "minLength": 1, "maxLength": 40, "description": "订单号，例如 12345"}},
+            lookup_demo_order,
+            required=["order_id"],
+        ),
     }
 
 
@@ -361,6 +396,35 @@ def billing_tools() -> Dict[str, AgentToolSpec]:
             },
             compare_amounts,
             required=["amount_a", "amount_b"],
+        ),
+        "lookup_order": make_tool(
+            "lookup_order",
+            "查询隔离的 lumendesk 演示订单，返回订单状态、金额和退款资格；不连接真实支付系统。",
+            {"order_id": {"type": "string", "minLength": 1, "maxLength": 40, "description": "订单号，例如 12345"}},
+            lookup_demo_order,
+            required=["order_id"],
+        ),
+        "create_refund_ticket": AgentToolSpec(
+            name="create_refund_ticket",
+            description="在用户明确确认后创建隔离的演示退款工单；不会执行真实退款。",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "order_id": {"type": "string", "minLength": 1, "maxLength": 40},
+                    "reason": {"type": "string", "minLength": 1, "maxLength": 240},
+                    "confirmed": {"type": "boolean"},
+                },
+                "required": ["order_id", "reason", "confirmed"],
+                "additionalProperties": False,
+            },
+            handler=create_demo_refund_ticket,
+            retry_safe=False,
+        ),
+        "lookup_account_security": make_tool(
+            "lookup_account_security",
+            "查询当前用户的演示账户安全状态；不会读取或修改真实账户，也不会索要密码或验证码。",
+            {},
+            lookup_demo_account_security,
         ),
     }
 

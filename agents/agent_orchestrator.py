@@ -73,6 +73,21 @@ def _grounding_guard(content: str, grounding_status: str) -> Tuple[str, bool]:
     return content, True
 
 
+def _demo_result_preview(tool_name: str, result: Any) -> Optional[Dict[str, Any]]:
+    """Expose only safe, structured demo-business results in the UI trace."""
+    if tool_name not in {"lookup_order", "create_refund_ticket", "lookup_account_security"}:
+        return None
+    if not isinstance(result, dict):
+        return None
+    allowed = {
+        "success", "found", "demo_data", "order_id", "product_name", "amount", "currency",
+        "status", "refund_status", "refund_ticket_id", "can_request_refund", "ticket_id",
+        "created", "next_step", "risk_status", "mfa_enabled", "trusted_devices",
+        "recommended_action", "requires_confirmation", "message", "error",
+    }
+    return {key: value for key, value in result.items() if key in allowed}
+
+
 # ── 数据结构 ──────────────────────────────────────────────────────────────────
 
 class AgentType(Enum):
@@ -427,6 +442,55 @@ class BaseAgent:
             messages.append({"role": "assistant", "content": "好的，我会优先依据这些资料回答。"})
         else:
             messages = []
+
+        # 对演示业务实体做一次确定性读取，确保现场演示展示真实工具闭环，
+        # 同时不依赖模型是否主动决定调用查询工具。
+        business_tool_name: Optional[str] = None
+        business_args: Dict[str, Any] = {}
+        order_ids = req.entities.get("order_id", []) if isinstance(req.entities, dict) else []
+        if "lookup_order" in tools and order_ids:
+            business_tool_name = "lookup_order"
+            business_args = {"order_id": str(order_ids[0])}
+        elif "lookup_account_security" in tools and req.intent in {
+            IntentCategory.ACCOUNT,
+            IntentCategory.ACCOUNT_SECURITY,
+        }:
+            business_tool_name = "lookup_account_security"
+        if business_tool_name:
+            spec = tools[business_tool_name]
+            business_t0 = time.monotonic()
+            try:
+                business_result = spec.handler(req, business_args)
+                if inspect.isawaitable(business_result):
+                    business_result = await business_result
+                if isinstance(business_result, dict):
+                    tools_used.append(business_tool_name)
+                    tool_traces.append({
+                        "agent_type": self.agent_type.value,
+                        "tool_name": business_tool_name,
+                        "tool_use_id": None,
+                        "input": dict(business_args),
+                        "success": bool(business_result.get("success")),
+                        "result_success": bool(business_result.get("success")),
+                        "latency_ms": round((time.monotonic() - business_t0) * 1000, 1),
+                        "cached": False,
+                        "reranked": False,
+                        "error": str(business_result.get("error", "") or ""),
+                        "source": "demo_business",
+                        "mcp_server": None,
+                        "mcp_tool": None,
+                        "retry_safe": spec.retry_safe,
+                        "grounding_status": None,
+                        "citations": [],
+                        "result_preview": _demo_result_preview(business_tool_name, business_result),
+                    })
+                    messages.append({
+                        "role": "user",
+                        "content": "[演示业务查询结果]\n" + json.dumps(business_result, ensure_ascii=False),
+                    })
+                    messages.append({"role": "assistant", "content": "好的，我会结合这份业务查询结果回答。"})
+            except Exception as ex:
+                logger.warning("演示业务查询失败: %s", ex)
         if req.context:
             messages.append({"role": "user", "content": f"[背景信息]\n{_clean(req.context)}"})
             messages.append({"role": "assistant", "content": "好的，我已了解背景信息。"})
@@ -544,6 +608,7 @@ class BaseAgent:
                             "retry_safe": spec.retry_safe if spec else True,
                             "grounding_status": result.get("grounding_status") if isinstance(result, dict) else None,
                             "citations": list(result.get("citations") or []) if isinstance(result, dict) else [],
+                            "result_preview": _demo_result_preview(name, result),
                         }
                     )
                     tool_results.append({
@@ -647,7 +712,7 @@ class GeneralAgent(BaseAgent):
         input_contract=("对话历史", "用户画像", "意图与紧急度", "知识库上下文"),
         output_contract=("先回应核心问题", "信息不足时只询问必要字段", "明确下一步和边界"),
         handoff_conditions=("涉及权限、资金、隐私或复杂投诉", "用户明确要求人工"),
-        tool_scope=("search_knowledge_base", "inspect_request_context", "suggest_required_fields"),
+        tool_scope=("search_knowledge_base", "inspect_request_context", "suggest_required_fields", "lookup_account_security", "lookup_order"),
         temperature=0.3,
         max_tokens=900,
     )
@@ -710,7 +775,7 @@ class BillingAgent(BaseAgent):
         input_contract=("订单号", "金额与币种", "支付时间", "支付渠道", "用户期望", "知识库上下文"),
         output_contract=("需要核验的信息", "当前可判断内容", "下一步处理路径", "时效边界"),
         handoff_conditions=("实际退款或补偿", "重复扣款或支付成功但订单未生效", "发票作废/重开", "企业合同或大额订单"),
-        tool_scope=("search_knowledge_base", "check_billing_fields", "compare_amounts"),
+        tool_scope=("search_knowledge_base", "check_billing_fields", "compare_amounts", "lookup_order", "create_refund_ticket", "lookup_account_security"),
         temperature=0.0,
         max_tokens=1100,
     )

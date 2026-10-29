@@ -132,9 +132,15 @@ def test_agent_tool_scopes_are_real_and_isolated():
     billing_tools = set(BillingAgent(FakeClient(), "test-model").get_tools())
     escalation_tools = set(EscalationAgent(FakeClient(), "test-model").get_tools())
 
-    assert general_tools == {"inspect_request_context", "suggest_required_fields"}
+    assert general_tools == {"inspect_request_context", "suggest_required_fields", "lookup_account_security", "lookup_order"}
     assert technical_tools == {"lookup_error_code", "build_diagnostic_plan"}
-    assert billing_tools == {"check_billing_fields", "compare_amounts"}
+    assert billing_tools == {
+        "check_billing_fields",
+        "compare_amounts",
+        "lookup_order",
+        "create_refund_ticket",
+        "lookup_account_security",
+    }
     assert escalation_tools == {"create_handoff_summary"}
     assert not general_tools & technical_tools
     assert not technical_tools & billing_tools

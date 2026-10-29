@@ -73,6 +73,10 @@
             <span>{{ call.latency_ms ?? '—' }} ms</span>
           </div>
           <pre>{{ formatJson(call.input || {}) }}</pre>
+          <div v-if="call.result_preview" class="trace-result">
+            <span>演示业务结果</span>
+            <pre>{{ formatJson(call.result_preview) }}</pre>
+          </div>
         </div>
         <p v-if="!lastTrace.trace.toolCalls?.length" class="muted">{{ lastTrace.trace.toolsUsed?.length ? lastTrace.trace.toolsUsed.join(' · ') : '本次没有记录到工具输入。' }}</p>
       </details>
