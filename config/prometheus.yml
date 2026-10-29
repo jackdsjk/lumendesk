@@ -12,7 +12,7 @@ rule_files:
 
 scrape_configs:
   # LumenDesk 主应用指标
-  - job_name: 'lumendesk-app'
+  - job_name: 'halex-app'
     static_configs:
       - targets: ['lumendesk:8000']
         labels:

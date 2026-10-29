@@ -1,3 +1,3 @@
-window.__LUMENDESK_CONFIG__ = {
+window.__HALEX_CONFIG__ = {
   pythonApiUrl: '/api/python'
 }

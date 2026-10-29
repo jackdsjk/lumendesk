@@ -5,7 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: lumendesk-frontend
+    image: halex-frontend:demo
+    container_name: halex-frontend
     environment:
       PYTHON_API_URL: ${PYTHON_API_URL:-http://localhost:8000}
     ports:

@@ -7,7 +7,7 @@ set -e
 
 # 配置
 IMAGE_NAME="lumendesk"
-CONTAINER_NAME="lumendesk-app"
+CONTAINER_NAME="halex-app"
 VERSION=${VERSION:-latest}
 REGISTRY=""  # 如果镜像在私有仓库，设置为 registry.example.com/
 

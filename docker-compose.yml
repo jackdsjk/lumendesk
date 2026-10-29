@@ -8,7 +8,7 @@ services:
   # ── Redis 缓存（工作记忆）────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: lumendesk-redis
+    container_name: halex-redis
     ports:
       - "127.0.0.1:6379:6379"
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-lumendesk123}
@@ -16,7 +16,7 @@ services:
       - redis-data:/data
     restart: unless-stopped
     networks:
-      - lumendesk-network
+      - halex-network
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-lumendesk123}", "ping"]
       interval: 10s
@@ -26,7 +26,7 @@ services:
   # ── ChromaDB 向量数据库（情景记忆 + 用户画像）────────────────────────────────
   chromadb:
     image: chromadb/chroma:0.5.23
-    container_name: lumendesk-chromadb
+    container_name: halex-chromadb
     ports:
       - "127.0.0.1:8001:8000"
     environment:
@@ -37,7 +37,7 @@ services:
       - chromadb-data:/chroma/chroma
     restart: unless-stopped
     networks:
-      - lumendesk-network
+      - halex-network
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/heartbeat || exit 1"]
       interval: 30s
@@ -48,7 +48,7 @@ services:
   # ── Prometheus 监控 ─────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
-    container_name: lumendesk-prometheus
+    container_name: halex-prometheus
     ports:
       - "127.0.0.1:9090:9090"
     command:
@@ -61,7 +61,7 @@ services:
       - prometheus-data:/prometheus
     restart: unless-stopped
     networks:
-      - lumendesk-network
+      - halex-network
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
       interval: 30s
@@ -75,7 +75,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: lumendesk-app
+    image: halex-api:demo
+    container_name: halex-app
     ports:
       - "127.0.0.1:8000:8000"
     env_file:
@@ -86,6 +87,7 @@ services:
       - CHROMA_PERSIST_DIRECTORY=/app/data/chroma
       - EVAL_BASELINE_PATH=/app/data/eval/baseline.json
       - LUMENDESK_SKILLS_DIR=/app/skills
+      - HALEX_DEMO_MODE=${HALEX_DEMO_MODE:-true}
     volumes:
       - ./data/chroma:/app/data/chroma
       - ./data/eval:/app/data/eval
@@ -99,7 +101,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - lumendesk-network
+      - halex-network
     healthcheck:
       # 生产镜像自带 Python，健康检查不依赖额外安装 curl。
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
@@ -113,7 +115,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: lumendesk-frontend
+    image: halex-frontend:demo
+    container_name: halex-frontend
     environment:
       PYTHON_API_URL: /api/python
     expose:
@@ -123,7 +126,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - lumendesk-network
+      - halex-network
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
       interval: 30s
@@ -134,7 +137,7 @@ services:
   # ── Nginx 反向代理 ──────────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine
-    container_name: lumendesk-nginx
+    container_name: halex-nginx
     ports:
       - "127.0.0.1:80:80"
     volumes:
@@ -147,7 +150,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - lumendesk-network
+      - halex-network
     healthcheck:
       # 显式使用 IPv4，与 Nginx 的监听地址保持一致。
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/health || exit 1"]
@@ -158,11 +161,8 @@ services:
 
 # ── 网络 ────────────────────────────────────────────────────────────────────
 networks:
-  lumendesk-network:
+  halex-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
 
 # ── 数据卷 ──────────────────────────────────────────────────────────────────
 volumes:

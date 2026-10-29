@@ -510,7 +510,7 @@ class KnowledgeBase:
         ]
         for doc in default_docs:
             doc.update({
-                "product_id": "lumendesk-demo",
+                "product_id": "halex-demo",
                 "tenant_scope": "global",
                 "approval_status": "approved",
                 "publication_status": "published",

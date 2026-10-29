@@ -9,6 +9,7 @@ data.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from threading import RLock
 from typing import Any, Dict, Optional
 
@@ -31,6 +32,7 @@ class DemoBusinessService:
 
     def __init__(self) -> None:
         self._lock = RLock()
+        self.demo_mode = os.getenv("HALEX_DEMO_MODE", "true").strip().lower() in {"1", "true", "yes", "on"}
         self._orders: Dict[str, DemoOrder] = {
             "12345": DemoOrder(
                 order_id="12345",
@@ -63,6 +65,8 @@ class DemoBusinessService:
         return str(order_id or "").strip().upper().lstrip("#")
 
     def lookup_order(self, user_id: str, order_id: str) -> Dict[str, Any]:
+        if not self.demo_mode:
+            return {"success": False, "demo_data": False, "error": "演示业务数据未启用"}
         normalized_id = self._normalize_order_id(order_id)
         with self._lock:
             order = self._orders.get(normalized_id)
@@ -98,6 +102,8 @@ class DemoBusinessService:
         reason: str,
         confirmed: bool,
     ) -> Dict[str, Any]:
+        if not self.demo_mode:
+            return {"success": False, "demo_data": False, "error": "演示业务数据未启用"}
         normalized_id = self._normalize_order_id(order_id)
         if not confirmed:
             return {
@@ -126,6 +132,8 @@ class DemoBusinessService:
             return {"success": True, "created": True, "demo_data": True, **ticket}
 
     def account_security(self, user_id: str) -> Dict[str, Any]:
+        if not self.demo_mode:
+            return {"success": False, "demo_data": False, "error": "演示业务数据未启用"}
         if user_id != "u1001":
             return {"success": False, "error": "未找到当前用户的演示账户"}
         return {

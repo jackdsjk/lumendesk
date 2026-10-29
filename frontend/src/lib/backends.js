@@ -20,7 +20,7 @@ export function createInitialSettings() {
 }
 
 export function saveSettings(settings) {
-  localStorage.setItem('lumendesk.frontend.settings', JSON.stringify({ ...settings, pythonToken: undefined }))
+  localStorage.setItem('halex.frontend.settings', JSON.stringify({ ...settings, pythonToken: undefined }))
 }
 
 export function backendMeta(type, settings) {
@@ -59,7 +59,7 @@ export async function requestKnowledgeDocuments(type, settings, limit = 100) {
 }
 
 export async function runEvaluation(type, settings, body = null, options = {}) {
-  const taskKey = `lumendesk.eval:${type}:${backendMeta(type, settings).baseUrl}:${settings.userId}`
+  const taskKey = `halex.eval:${type}:${backendMeta(type, settings).baseUrl}:${settings.userId}`
   const savedJob = sessionStorage.getItem(taskKey)
   const initial = savedJob ? {job_id: savedJob, status: 'queued', completed: 0, total: 0} : await requestFor(type, settings, '/eval/run', {
     method: 'POST',
@@ -225,7 +225,11 @@ function normalizeBaseUrl(value) {
 
 function readSettings() {
   try {
-    return JSON.parse(localStorage.getItem('lumendesk.frontend.settings') || '{}')
+    const current = localStorage.getItem('halex.frontend.settings')
+    const legacy = localStorage.getItem('lumendesk.frontend.settings')
+    const value = current || legacy || '{}'
+    if (!current && legacy) localStorage.setItem('halex.frontend.settings', legacy)
+    return JSON.parse(value)
   } catch {
     return {}
   }
@@ -233,5 +237,5 @@ function readSettings() {
 
 function runtimeConfig() {
   if (typeof window === 'undefined') return {}
-  return window.__LUMENDESK_CONFIG__ || {}
+  return window.__HALEX_CONFIG__ || window.__LUMENDESK_CONFIG__ || {}
 }

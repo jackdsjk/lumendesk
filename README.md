@@ -115,9 +115,12 @@ ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
 ANTHROPIC_MODEL=替换为服务商当前支持的模型ID
 ANTHROPIC_API_KEY=替换为该模型服务的Key
 
-# 本地演示模式
+# 本地演示模式（仅使用模拟业务数据）
 LUMENDESK_ENV=development
 REDIS_PASSWORD=lumendesk123
+
+# 订单、账户安全和退款工单均为内存模拟，不连接真实业务系统。
+HALEX_DEMO_MODE=true
 
 # Docker 网络内的 ChromaDB 地址
 CHROMA_HOST=chromadb
@@ -152,6 +155,17 @@ docker compose logs -f lumendesk
 | Prometheus | `http://localhost:9090` | 查询监控指标 |
 
 健康检查成功后，在 Swagger 中执行一次 `POST /chat`，确认模型也能正常调用。`/health` 不验证模型 Key、额度或模型名称。
+
+### 演示部署口径
+
+当前对外展示建议保持以下边界：
+
+- `HALEX_DEMO_MODE=true`：订单、账户安全和退款工单全部使用隔离的内存模拟数据。
+- 不接入真实支付、订单、客户或退款系统；模拟退款只生成 `RFD-DEMO-*` 工单。
+- 对外部署仍设置 `LUMENDESK_ENV=production` 和独立的 `LUMENDESK_API_TOKENS`，不要把模型 Key 放到前端。
+- Nginx 已提供基础 API 限流；若公开分享，还应在部署平台或网关增加域名、HTTPS 和更严格的额度控制。
+
+因此，当前 Compose 部署适合产品演示和受限试用，不代表生产业务系统已经接通。
 
 ### 4. 单独启动前端（可选）
 
@@ -194,6 +208,9 @@ docker compose up -d --build
 | `LUMENDESK_SKILLS_MAX_PROMPT_CHARS` | Skills 注入字符预算，默认 5000。 |
 | `LUMENDESK_ENV` | 鉴权部署模式，默认 `development`；`production` 必须配置访问 Token。 |
 | `LUMENDESK_API_TOKENS` | 访问 Token 与用户、角色的 JSON 映射，见部署章节。 |
+| `HALEX_DEMO_MODE` | 是否启用隔离的内存模拟订单、账户安全和退款工单；演示部署保持 `true`。 |
+
+说明：`LUMENDESK_*` 是历史配置前缀，为兼容已有 `.env` 和部署脚本暂时保留；用户界面、容器、镜像和运行时标识已统一为 lumendesk。
 
 `APP_ENV` 与 `LUMENDESK_ENV` 用途不同：前者控制 `python api/main.py` 的开发热重载，后者控制生产鉴权要求。Docker 镜像通过 Uvicorn 启动，监听地址和端口由镜像命令指定；修改 `API_HOST`、`API_PORT` 不会改变 Compose 的端口映射。
 
@@ -305,7 +322,7 @@ docker compose exec -T lumendesk python scripts/check_embedding.py
 
 ## 对话与知识库使用
 
-以下示例按本地未启用鉴权的服务编写。启用后，HTTP 请求还需添加 `Authorization: Bearer <LumenDesk访问Token>`。
+以下示例按本地未启用鉴权的服务编写。启用后，HTTP 请求还需添加 `Authorization: Bearer <halex访问Token>`。
 
 ### 发送消息
 
@@ -316,7 +333,7 @@ docker compose exec -T lumendesk python scripts/check_embedding.py
   "message": "登录时提示401错误，应该怎么处理？",
   "user_id": "demo_user",
   "client_request_id": "demo-login-001",
-  "product_id": "lumendesk-support-cloud",
+  "product_id": "halex-support-cloud",
   "region": "AU",
   "channel": "web",
   "tenant_scope": "global"
@@ -614,7 +631,7 @@ LUMENDESK_API_TOKENS='{"替换为至少24字符的随机用户Token":{"user_id":
 用独立随机值替换示例中的 Token，可通过 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成。生产模式缺少或配置无效时启动失败。客户端发送：
 
 ```http
-Authorization: Bearer <LumenDesk访问Token>
+Authorization: Bearer <halex访问Token>
 ```
 
 - 普通用户可访问聊天、共享知识查询、Skills 列表和本地 MCP；聊天身份来自 Token 中的 `user_id`。

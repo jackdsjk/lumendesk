@@ -9,7 +9,7 @@ from pydantic import Field, BaseModel
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-hosts = os.getenv("MCP_ALLOWED_HOSTS", "localhost,localhost:*,127.0.0.1,127.0.0.1:*,lumendesk,lumendesk:*,lumendesk-python,lumendesk-python:*")
+hosts = os.getenv("MCP_ALLOWED_HOSTS", "localhost,localhost:*,127.0.0.1,127.0.0.1:*,lumendesk,lumendesk:*")
 origins = os.getenv("MCP_ALLOWED_ORIGINS", "http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*")
 server = FastMCP("LumenDesk Knowledge", stateless_http=True, json_response=True, streamable_http_path="/",
                 transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=True,
@@ -26,7 +26,7 @@ def configure(kb, manager=None):
 
 class KnowledgeSearchResult(BaseModel):
     results: List[Dict[str, Any]]
-    source: str = "lumendesk_knowledge"
+    source: str = "halex_knowledge"
 
 
 @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True))
