@@ -159,6 +159,27 @@ services:
       retries: 3
       start_period: 10s
 
+  # ── Cloudflare Tunnel（仅公网部署时启用）────────────────────────────────────
+  # 该容器只加入内部 Docker 网络，不发布任何宿主机端口。
+  # Cloudflare Dashboard 中的 Public Hostname 应分别指向 nginx:80 或 lumendesk:8000。
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: halex-cloudflared
+    profiles:
+      - cloudflare
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      lumendesk:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - halex-network
+
 # ── 网络 ────────────────────────────────────────────────────────────────────
 networks:
   halex-network:

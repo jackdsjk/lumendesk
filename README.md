@@ -18,6 +18,7 @@ LumenDesk 是面向客服场景的多 Agent 应用，提供通用咨询、技术
 - [评测与监控](#evaluation)
 - [本地开发与测试](#development)
 - [部署与数据管理](#deployment)
+- [Cloudflare Tunnel 公网入口](#cloudflare-tunnel)
 - [常见问题](#faq)
 - [项目结构与详细文档](#documentation)
 
@@ -671,6 +672,51 @@ docker compose down
 - 知识库写入锁是进程内锁，多副本同时导入需要另行协调；ChromaDB 的更新和删除不是跨进程原子事务。
 - 重试回执避免已完成聊天重复写入，但无法保证进程崩溃前后的模型调用恰好执行一次。
 - 当前知识库是共享库，用户会话隔离不等于知识库按租户隔离。接入真实业务数据时，应按实际访问范围扩展权限模型。
+
+<a id="cloudflare-tunnel"></a>
+
+### Cloudflare Tunnel 公网入口
+
+公网部署只对外提供 Cloudflare 域名，不公开服务器 IP、宿主机端口或内部地址。仓库中的 `cloudflared` 服务默认关闭，只有显式启用 `cloudflare` profile 才会启动。
+
+1. 在 Cloudflare 中添加你控制的域名，并创建一个 **Managed Tunnel**。不要使用临时 Quick Tunnel：它没有稳定域名，且不支持 SSE。
+2. 在 Tunnel 的 **Public Hostnames** 中配置路由：
+
+   | 公网主机名 | Tunnel 内部服务 |
+   |---|---|
+   | `app.example.com` | `http://nginx:80` |
+   | `api.example.com` | `http://lumendesk:8000` |
+
+   如果前端继续使用 GitHub Pages，只配置 `api.example.com` 即可；如果使用本仓库内置前端，同时配置 `app.example.com`。
+
+3. 将 Cloudflare 生成的 Tunnel token 只写入服务器上的 `.env`：
+
+   ```dotenv
+   LUMENDESK_ENV=production
+   HALEX_DEMO_MODE=true
+   LUMENDESK_API_TOKENS='{"替换为至少24字符的随机用户Token":{"user_id":"u1","role":"user"}}'
+   CLOUDFLARE_TUNNEL_TOKEN=替换为Cloudflare生成的token
+   ```
+
+4. 在项目根目录启动：
+
+   ```bash
+   docker compose --profile cloudflare up -d --build
+   docker compose --profile cloudflare ps
+   ```
+
+   Tunnel 容器只通过 Docker 内部服务名访问 API 和 Nginx，不发布任何额外端口。默认 Compose 启动不包含该容器。
+
+5. 前端连接独立 API 时，将构建变量设置为 Cloudflare 域名：
+
+   ```dotenv
+   VITE_DEMO_MODE=false
+   VITE_PYTHON_API_URL=https://api.example.com
+   ```
+
+   后端 CORS 只允许实际的前端域名；DeepSeek key 和 Tunnel token 只保留在服务器环境变量中。
+
+验证公网入口时只访问 Cloudflare 域名，例如 `https://api.example.com/health`。如果之前曾经公开过服务器 IP，应删除对应 DNS 记录并检查防火墙，确保 API 端口不能被绕过 Cloudflare 直接访问。
 
 <a id="faq"></a>
 
