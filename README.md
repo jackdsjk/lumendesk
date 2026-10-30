@@ -74,6 +74,42 @@ Redis 事务写入用户消息、助手回复和响应回执
 
 **意图识别负责路由和提供上下文，RAG 由 Agent 通过工具自主调用。** 细粒度技术意图共享知识库，无需按每个意图维护一套文档。
 
+### 数据流与存储状态
+
+下面这张图会由 GitHub 直接渲染，展示一次客服请求的主要数据流，以及 Redis 和 ChromaDB 当前承担的状态边界。实时运行指标仍以 `/monitor` 和 Prometheus 为准；完整的静态架构图见 [wiki/架构图.md](wiki/架构图.md)。
+
+```mermaid
+flowchart LR
+    client["Web 前端 / API 客户端"] --> nginx["Nginx<br/>统一入口"]
+    nginx --> api["FastAPI<br/>LumenDesk API"]
+
+    api --> gate["鉴权 + 会话锁<br/>幂等回执检查"]
+    gate --> intent["IntentRecognizer<br/>LLM + Embedding + Pattern"]
+    intent --> router["AgentOrchestrator<br/>RoutingDecision"]
+    router --> agents["General / Technical<br/>Billing / Escalation Agent"]
+    agents --> skills["SkillManager<br/>skills/*/SKILL.md"]
+    agents --> model["DeepSeek / Claude<br/>模型服务"]
+    agents --> rag["RAG 工具<br/>召回与重排"]
+    rag --> kb[("ChromaDB<br/>knowledge_base")]
+
+    gate --> redis[("Redis<br/>消息 / 摘要 / 回执 / 轨迹")]
+    agents --> redis
+    redis --> memory["后台记忆维护"]
+    memory --> episodic[("ChromaDB<br/>episodic")]
+    memory --> profile[("ChromaDB<br/>user_profile")]
+
+    agents --> result["ChatResponse<br/>工具轨迹与状态"]
+    result --> client
+    api -.指标.-> monitor["Monitor + Prometheus"]
+
+    classDef service fill:#e8f1ff,stroke:#2f6fed,color:#102a43;
+    classDef storage fill:#fff3d6,stroke:#c77d00,color:#4a2a00;
+    classDef control fill:#e9f7ef,stroke:#2f855a,color:#173b2b;
+    class nginx,api,router,agents,model,rag,result service;
+    class redis,kb,episodic,profile storage;
+    class gate,intent,skills,memory,monitor control;
+```
+
 ### Demo 2.0：可现场演示的业务闭环
 
 为了让演示不只依赖预置问答，lumendesk 内置了隔离的模拟业务服务：
